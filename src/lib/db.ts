@@ -25,6 +25,12 @@ export class MaliWashDB extends Dexie {
       bookings: 'id, status, syncStatus',
       settings: 'id, syncStatus'
     });
+
+    // v3: Bookings.tsx orders by requestedTime, which Dexie can only do on an
+    // indexed field — without this the bookings page throws SchemaError on load.
+    this.version(3).stores({
+      bookings: 'id, status, requestedTime, createdAt, syncStatus'
+    });
   }
 }
 

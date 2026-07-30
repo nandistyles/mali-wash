@@ -1,31 +1,54 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Catch-all
-    match /{document=**} {
-      allow read, write: if false;
-    }
 
-    // Global Functions
+    // ---------------------------------------------------------------------
+    // Identity
+    //
+    // A staff member's Firestore document id IS their Firebase Auth uid.
+    // There is deliberately no self-service path to create a staff document:
+    // the first admin must be created by hand in the Firebase console, and
+    // every subsequent staff member is created by an existing admin. Any
+    // signed-in Google account without a staff document has no access at all.
+    // ---------------------------------------------------------------------
+
     function isSignedIn() {
-      return true;
-    }
-    
-    // For admin role: check if the staff document exists and role is admin, or if it's the bootstrap user
-    function isAdmin() {
-      return true;
+      return request.auth != null;
     }
 
-    function isStaff() {
-      return true;
+    function staffDoc() {
+      return get(/databases/$(database)/documents/staff/$(request.auth.uid)).data;
     }
-    
+
+    // Identity only. Grants access to the SHARED hub collections, which every
+    // Mali business reads (customers, transactions, pointsLedger, referrals).
+    function isStaff() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+        && staffDoc().active == true;
+    }
+
+    // Authorisation for a specific business. Gates business-specific
+    // collections and controls which business a staff member may book money
+    // against. A supervisor may span several; an attendant usually one.
+    function canOperate(business) {
+      return isStaff() && (business in staffDoc().businesses);
+    }
+
+    function isAdmin() {
+      return isStaff() && staffDoc().role == 'admin';
+    }
+
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
-    
+
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
+
+    // ---------------------------------------------------------------------
+    // Shape validation
+    // ---------------------------------------------------------------------
 
     function isValidCustomer(data) {
       return data.keys().hasAll(['id', 'name', 'phone', 'vehicles', 'pointsBalance', 'referralCode', 'tags', 'createdByBusiness', 'createdAt', 'updatedAt'])
@@ -57,10 +80,10 @@ service cloud.firestore {
         && (!('customerId' in data) || data.customerId == null || data.customerId is string)
         && (!('customerPhone' in data) || data.customerPhone == null || data.customerPhone is string)
         && data.lineItems is list
-        && data.amount is number
+        && data.amount is number && data.amount >= 0
         && data.paymentMethod in ['cash_usd', 'ecocash', 'card']
-        && data.pointsEarned is number
-        && data.pointsRedeemed is number
+        && data.pointsEarned is number && data.pointsEarned >= 0
+        && data.pointsRedeemed is number && data.pointsRedeemed >= 0
         && data.staffId is string
         && (!('shiftId' in data) || data.shiftId == null || data.shiftId is string)
         && data.status in ['completed', 'voided']
@@ -135,6 +158,10 @@ service cloud.firestore {
         && data.referralRewardPoints is number;
     }
 
+    // ---------------------------------------------------------------------
+    // Shared hub collections — readable by staff of ANY Mali business
+    // ---------------------------------------------------------------------
+
     match /customers/{customerId} {
       allow get, list: if isStaff();
       allow create: if isStaff() && isValidId(customerId) && isValidCustomer(incoming());
@@ -144,59 +171,77 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(customerId);
     }
 
-    match /washMemberships/{membershipId} {
-      allow get, list: if isStaff();
-      allow create: if isStaff() && isValidId(membershipId) && isValidWashMembership(incoming());
-      allow update: if isStaff() && isValidId(membershipId) && isValidWashMembership(incoming()) && (
-        incoming().diff(existing()).affectedKeys().hasOnly(['tier', 'expiry'])
-      );
-      allow delete: if isAdmin() && isValidId(membershipId);
-    }
-
     match /transactions/{transactionId} {
       allow get, list: if isStaff();
-      allow create: if isStaff() && isValidId(transactionId) && isValidTransaction(incoming());
-      allow update: if isStaff() && isValidId(transactionId) && isValidTransaction(incoming()) && (
+      // You may only book money against a business you are assigned to.
+      allow create: if canOperate(incoming().business) && isValidId(transactionId) && isValidTransaction(incoming());
+      // Voiding only — a completed sale is never silently rewritten.
+      allow update: if canOperate(existing().business) && isValidId(transactionId) && isValidTransaction(incoming()) && (
         incoming().diff(existing()).affectedKeys().hasOnly(['status'])
       );
-      allow delete: if isAdmin() && isValidId(transactionId);
+      allow delete: if false; // ledger integrity: void, never delete
     }
 
     match /pointsLedger/{entryId} {
       allow get, list: if isStaff();
-      allow create: if isStaff() && isValidId(entryId) && isValidPointsLedgerEntry(incoming());
-      allow update: if false; // Append-only ledger
-      allow delete: if isAdmin() && isValidId(entryId);
+      allow create: if canOperate(incoming().business) && isValidId(entryId) && isValidPointsLedgerEntry(incoming());
+      allow update: if false; // append-only ledger
+      allow delete: if false; // correct mistakes with an 'adjustment' entry
+    }
+
+    match /referralRedemptions/{redemptionId} {
+      allow get, list: if isStaff();
+      allow create: if canOperate(incoming().business) && isValidId(redemptionId) && isValidReferralRedemption(incoming());
+      allow update: if false;
+      allow delete: if isAdmin() && isValidId(redemptionId);
     }
 
     match /staff/{staffId} {
-      allow get, list: if isStaff() || request.auth.uid == staffId;
-      allow create: if (isAdmin() || request.auth.uid == staffId) && isValidId(staffId) && isValidStaff(incoming());
+      // A staff member can always read their own record (needed to resolve
+      // their own role before any other rule can be evaluated).
+      allow get: if isSignedIn() && request.auth.uid == staffId;
+      allow list: if isStaff();
+      // No self-create: admins provision staff, console provisions the first admin.
+      allow create: if isAdmin() && isValidId(staffId) && isValidStaff(incoming());
       allow update: if isAdmin() && isValidId(staffId) && isValidStaff(incoming()) && (
         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'businesses', 'active', 'pin'])
       );
       allow delete: if isAdmin() && isValidId(staffId);
     }
 
-    match /shifts/{shiftId} {
+    // ---------------------------------------------------------------------
+    // Wash-specific collections
+    // ---------------------------------------------------------------------
+
+    match /washMemberships/{membershipId} {
       allow get, list: if isStaff();
-      allow create: if isStaff() && isValidId(shiftId) && isValidShift(incoming());
-      allow update: if isStaff() && isValidId(shiftId) && isValidShift(incoming()) && (
+      allow create: if canOperate('wash') && isValidId(membershipId) && isValidWashMembership(incoming());
+      allow update: if canOperate('wash') && isValidId(membershipId) && isValidWashMembership(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['tier', 'expiry'])
+      );
+      allow delete: if isAdmin() && isValidId(membershipId);
+    }
+
+    match /shifts/{shiftId} {
+      allow get, list: if canOperate('wash');
+      allow create: if canOperate('wash') && isValidId(shiftId) && isValidShift(incoming());
+      allow update: if canOperate('wash') && isValidId(shiftId) && isValidShift(incoming()) && (
         incoming().diff(existing()).affectedKeys().hasOnly(['closedAt', 'expectedCash', 'expectedEcocash', 'expectedCard', 'countedCash', 'variance', 'status'])
       );
       allow delete: if isAdmin() && isValidId(shiftId);
     }
 
-    match /referralRedemptions/{redemptionId} {
-      allow get, list: if isStaff();
-      allow create: if isStaff() && isValidId(redemptionId) && isValidReferralRedemption(incoming());
-      allow delete: if isAdmin() && isValidId(redemptionId);
-    }
-
     match /bookings/{bookingId} {
-      allow get, list: if isStaff();
-      allow create: if isStaff() && isValidId(bookingId) && isValidBooking(incoming());
-      allow update: if isStaff() && isValidId(bookingId) && isValidBooking(incoming()) && (
+      allow get, list: if canOperate('wash');
+      // The public booking form at /book is unauthenticated by design, so this
+      // is the one anonymous write in the whole database. It is narrowed hard:
+      // create only, never read, and the status is pinned to 'pending' so a
+      // stranger cannot self-confirm. Turn on Firebase App Check before this
+      // goes live — validation stops malformed writes, not a spam script.
+      allow create: if isValidId(bookingId)
+        && isValidBooking(incoming())
+        && incoming().status == 'pending';
+      allow update: if canOperate('wash') && isValidId(bookingId) && isValidBooking(incoming()) && (
         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'requestedTime', 'vehicle', 'serviceType', 'name', 'phone'])
       );
       allow delete: if isAdmin() && isValidId(bookingId);
@@ -205,7 +250,13 @@ service cloud.firestore {
     match /settings/{settingsId} {
       allow get, list: if isStaff();
       allow create, update: if isAdmin() && isValidId(settingsId) && isValidSettings(incoming());
-      allow delete: if false; 
+      allow delete: if false;
     }
+
+    // Anything not matched above is denied by default. There is deliberately
+    // no `match /{document=**}` catch-all here: Firestore ORs all matching
+    // rules together, so a catch-all can only ever widen access, never
+    // restrict it. The `allow ... if false` version that used to sit at the
+    // top of this file gave a false sense of a deny-by-default backstop.
   }
 }

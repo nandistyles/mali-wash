@@ -43,7 +43,7 @@ export default function Bookings() {
           </div>
         ) : (
           bookings?.map(booking => (
-            <Card key={booking.id} className={`border-l-4 \${
+            <Card key={booking.id} className={`border-l-4 ${
               booking.status === 'pending' ? 'border-l-amber-500' :
               booking.status === 'confirmed' ? 'border-l-teal-500' : 'border-l-slate-300'
             }`}>
@@ -51,7 +51,7 @@ export default function Bookings() {
                 <div>
                   <div className="flex items-center gap-3 mb-2">
                     <h3 className="font-bold text-lg text-slate-900">{booking.name}</h3>
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider \${
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
                       booking.status === 'pending' ? 'bg-amber-100 text-amber-800' :
                       booking.status === 'confirmed' ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-600'
                     }`}>

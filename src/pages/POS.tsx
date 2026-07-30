@@ -220,7 +220,7 @@ export default function POS() {
       {/* Right Sidebar - Checkout */}
       <aside className="w-full lg:w-[400px] bg-white border-l border-slate-200 flex flex-col shadow-[-10px_0_30px_rgba(0,0,0,0.02)] z-10 shrink-0">
         {/* Customer Identity Bar */}
-        <div className={`p-6 border-b-2 \${isAnonymous ? 'bg-slate-50 border-slate-200' : 'bg-teal-50 border-teal-200'}`}>
+        <div className={`p-6 border-b-2 ${isAnonymous ? 'bg-slate-50 border-slate-200' : 'bg-teal-50 border-teal-200'}`}>
           {isAnonymous ? (
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center text-slate-400">

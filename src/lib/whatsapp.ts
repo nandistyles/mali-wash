@@ -15,12 +15,12 @@ export async function sendWhatsAppMessage(phone: string, message: string) {
 
   // Example implementation of actual Cloud API call (needs proxy usually to avoid CORS):
   /*
-  const url = `https://graph.facebook.com/v17.0/\${phoneId}/messages`;
+  const url = `https://graph.facebook.com/v17.0/${phoneId}/messages`;
   try {
     await fetch(url, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer \${token}`,
+        'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -37,11 +37,11 @@ export async function sendWhatsAppMessage(phone: string, message: string) {
 }
 
 export async function sendBookingConfirmation(phone: string, name: string, time: string, service: string) {
-  const msg = `Hi \${name}, your booking for a \${service} at \${time} is confirmed! See you at Mali Wash.`;
+  const msg = `Hi ${name}, your booking for a ${service} at ${time} is confirmed! See you at Mali Wash.`;
   await sendWhatsAppMessage(phone, msg);
 }
 
 export async function sendReferralCode(phone: string, name: string, code: string) {
-  const msg = `Hi \${name}! Share your Mali Wash referral code \${code} with friends. When they get their first wash, you earn bonus points!`;
+  const msg = `Hi ${name}! Share your Mali Wash referral code ${code} with friends. When they get their first wash, you earn bonus points!`;
   await sendWhatsAppMessage(phone, msg);
 }

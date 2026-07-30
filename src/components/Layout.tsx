@@ -77,11 +77,11 @@ export default function Layout() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center gap-1 transition-colors \${
+                className={`flex flex-col items-center gap-1 transition-colors ${
                   active ? 'text-[#004D4D]' : 'text-slate-400 hover:text-slate-600'
                 }`}
               >
-                <div className={`p-3 rounded-xl transition-colors \${
+                <div className={`p-3 rounded-xl transition-colors ${
                   active ? 'bg-teal-100' : 'hover:bg-slate-100'
                 }`}>
                   <item.icon className="w-6 h-6" />
@@ -102,7 +102,7 @@ export default function Layout() {
       <footer className="h-8 bg-slate-800 flex items-center justify-between px-6 text-[10px] text-slate-400 font-bold shrink-0">
         <div>
           DB SYNC STATUS: <span className={isOnline ? "text-emerald-400" : "text-amber-400"}>
-            {isOnline ? `OK \${lastSync ? \`(LAST: \${lastSync.toLocaleTimeString()})\` : ''}` : 'OFFLINE'}
+            {isOnline ? `OK ${lastSync ? `(LAST: ${lastSync.toLocaleTimeString()})` : ''}` : 'OFFLINE'}
           </span>
         </div>
         <div className="flex gap-6 uppercase">

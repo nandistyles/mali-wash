@@ -81,7 +81,7 @@ export default function Shifts() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Active Shift Card */}
-        <Card className={`border-2 \${activeShift ? 'border-teal-500' : 'border-slate-200'}`}>
+        <Card className={`border-2 ${activeShift ? 'border-teal-500' : 'border-slate-200'}`}>
           <CardHeader className={activeShift ? 'bg-teal-50' : ''}>
             <CardTitle>{activeShift ? 'Active Shift' : 'No Active Shift'}</CardTitle>
           </CardHeader>
@@ -192,7 +192,7 @@ export default function Shifts() {
                     </div>
                     <div className="col-span-2 mt-1">
                       <span className="text-slate-400 text-xs uppercase block">Variance</span>
-                      <span className={`font-bold \${
+                      <span className={`font-bold ${
                         (shift.variance || 0) === 0 ? 'text-teal-600' : 'text-red-500'
                       }`}>
                         {formatCurrency(shift.variance || 0)}
