@@ -1,0 +1,6 @@
+{
+  "name": "Mali Wash",
+  "description": "Offline-first point-of-sale and customer management system for a car wash.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

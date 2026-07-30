@@ -1,0 +1,224 @@
+{
+  "entities": {
+    "Customer": {
+      "title": "Customer",
+      "description": "A customer of the car wash",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "vehicles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "reg": { "type": "string", "maxLength": 20 },
+              "makeModel": { "type": "string", "maxLength": 100 }
+            },
+            "required": ["reg", "makeModel"]
+          }
+        },
+        "pointsBalance": { "type": "number" },
+        "referralCode": { "type": "string", "maxLength": 20 },
+        "referredByCode": { "type": "string", "maxLength": 20 },
+        "tags": { "type": "array", "items": { "type": "string", "maxLength": 50 } },
+        "createdByBusiness": { "type": "string", "enum": ["wash", "parts", "drive", "track"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["id", "name", "phone", "vehicles", "pointsBalance", "referralCode", "tags", "createdByBusiness", "createdAt", "updatedAt"]
+    },
+    "WashMembership": {
+      "title": "WashMembership",
+      "description": "Wash-specific membership tier for a customer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "tier": { "type": "string", "enum": ["none", "basic_member", "premium_member"] },
+        "expiry": { "type": "number", "nullable": true }
+      },
+      "required": ["id", "customerId", "tier"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "A unified payment transaction for a service",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "business": { "type": "string", "enum": ["wash", "parts", "drive", "track"] },
+        "customerId": { "type": "string", "nullable": true },
+        "customerPhone": { "type": "string", "nullable": true },
+        "lineItems": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "description": { "type": "string", "maxLength": 200 },
+              "qty": { "type": "number" },
+              "unitPrice": { "type": "number" },
+              "total": { "type": "number" }
+            },
+            "required": ["description", "qty", "unitPrice", "total"]
+          }
+        },
+        "amount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["cash_usd", "ecocash", "card"] },
+        "pointsEarned": { "type": "number" },
+        "pointsRedeemed": { "type": "number" },
+        "staffId": { "type": "string" },
+        "shiftId": { "type": "string", "nullable": true },
+        "status": { "type": "string", "enum": ["completed", "voided"] },
+        "businessMeta": {
+          "type": "object",
+          "properties": {},
+          "additionalProperties": true
+        },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "business", "lineItems", "amount", "paymentMethod", "pointsEarned", "pointsRedeemed", "staffId", "status", "createdAt", "businessMeta"]
+    },
+    "PointsLedgerEntry": {
+      "title": "PointsLedgerEntry",
+      "description": "Append-only ledger of every points event",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "customerId": { "type": "string" },
+        "business": { "type": "string", "enum": ["wash", "parts", "drive", "track"] },
+        "type": { "type": "string", "enum": ["earn", "redeem", "referral_reward", "adjustment"] },
+        "points": { "type": "number" },
+        "transactionId": { "type": "string", "nullable": true },
+        "reason": { "type": "string", "maxLength": 255 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "customerId", "business", "type", "points", "reason", "createdAt"]
+    },
+    "Staff": {
+      "title": "Staff",
+      "description": "A staff member or user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["attendant", "supervisor", "admin"] },
+        "businesses": { "type": "array", "items": { "type": "string", "enum": ["wash", "parts", "drive", "track"] } },
+        "active": { "type": "boolean" },
+        "pin": { "type": "string", "nullable": true }
+      },
+      "required": ["id", "name", "role", "businesses", "active"]
+    },
+    "Shift": {
+      "title": "Shift",
+      "description": "A work shift for a staff member",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "staffId": { "type": "string" },
+        "openedAt": { "type": "number" },
+        "closedAt": { "type": "number", "nullable": true },
+        "openingFloat": { "type": "number" },
+        "expectedCash": { "type": "number" },
+        "expectedEcocash": { "type": "number" },
+        "expectedCard": { "type": "number" },
+        "countedCash": { "type": "number", "nullable": true },
+        "variance": { "type": "number", "nullable": true },
+        "status": { "type": "string", "enum": ["open", "closed"] }
+      },
+      "required": ["id", "staffId", "openedAt", "openingFloat", "expectedCash", "expectedEcocash", "expectedCard", "status"]
+    },
+    "ReferralRedemption": {
+      "title": "ReferralRedemption",
+      "description": "A record of a redeemed referral",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "referrerId": { "type": "string" },
+        "refereeId": { "type": "string" },
+        "business": { "type": "string", "enum": ["wash", "parts", "drive", "track"] },
+        "rewardPoints": { "type": "number" },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "referrerId", "refereeId", "business", "rewardPoints", "createdAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "A customer booking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "maxLength": 100 },
+        "phone": { "type": "string", "maxLength": 20 },
+        "vehicle": { "type": "string", "maxLength": 100 },
+        "serviceType": { "type": "string", "maxLength": 50 },
+        "requestedTime": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "done"] },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["id", "name", "phone", "vehicle", "serviceType", "requestedTime", "status", "createdAt"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Global application settings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "services": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" },
+              "type": { "type": "string" }
+            },
+            "required": ["id", "name", "price", "type"]
+          }
+        },
+        "pointsPerWash": { "type": "number" },
+        "referralRewardPoints": { "type": "number" }
+      },
+      "required": ["id", "services", "pointsPerWash", "referralRewardPoints"]
+    }
+  },
+  "firestore": {
+    "customers": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Collection of all customers"
+    },
+    "washMemberships": {
+      "schema": { "$ref": "#/entities/WashMembership" },
+      "description": "Wash-specific membership tiers"
+    },
+    "transactions": {
+      "schema": { "$ref": "#/entities/Transaction" },
+      "description": "Collection of all transactions"
+    },
+    "pointsLedger": {
+      "schema": { "$ref": "#/entities/PointsLedgerEntry" },
+      "description": "Append-only ledger of every points event"
+    },
+    "staff": {
+      "schema": { "$ref": "#/entities/Staff" },
+      "description": "Collection of all staff members"
+    },
+    "shifts": {
+      "schema": { "$ref": "#/entities/Shift" },
+      "description": "Collection of all shifts"
+    },
+    "referralRedemptions": {
+      "schema": { "$ref": "#/entities/ReferralRedemption" },
+      "description": "Collection of all referral redemptions"
+    },
+    "bookings": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Collection of all bookings"
+    },
+    "settings": {
+      "schema": { "$ref": "#/entities/Settings" },
+      "description": "Global settings singleton"
+    }
+  }
+}

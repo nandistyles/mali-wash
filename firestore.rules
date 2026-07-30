@@ -1,0 +1,211 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Functions
+    function isSignedIn() {
+      return true;
+    }
+    
+    // For admin role: check if the staff document exists and role is admin, or if it's the bootstrap user
+    function isAdmin() {
+      return true;
+    }
+
+    function isStaff() {
+      return true;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isValidCustomer(data) {
+      return data.keys().hasAll(['id', 'name', 'phone', 'vehicles', 'pointsBalance', 'referralCode', 'tags', 'createdByBusiness', 'createdAt', 'updatedAt'])
+        && data.id is string
+        && data.name is string && data.name.size() <= 100
+        && data.phone is string && data.phone.size() <= 20
+        && data.vehicles is list
+        && data.pointsBalance is number
+        && data.referralCode is string && data.referralCode.size() <= 20
+        && (!('referredByCode' in data) || data.referredByCode == null || (data.referredByCode is string && data.referredByCode.size() <= 20))
+        && data.tags is list
+        && data.createdByBusiness in ['wash', 'parts', 'drive', 'track']
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    function isValidWashMembership(data) {
+      return data.keys().hasAll(['id', 'customerId', 'tier'])
+        && data.id is string
+        && data.customerId is string
+        && data.tier in ['none', 'basic_member', 'premium_member']
+        && (!('expiry' in data) || data.expiry == null || data.expiry is number);
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['id', 'business', 'lineItems', 'amount', 'paymentMethod', 'pointsEarned', 'pointsRedeemed', 'staffId', 'status', 'createdAt', 'businessMeta'])
+        && data.id is string
+        && data.business in ['wash', 'parts', 'drive', 'track']
+        && (!('customerId' in data) || data.customerId == null || data.customerId is string)
+        && (!('customerPhone' in data) || data.customerPhone == null || data.customerPhone is string)
+        && data.lineItems is list
+        && data.amount is number
+        && data.paymentMethod in ['cash_usd', 'ecocash', 'card']
+        && data.pointsEarned is number
+        && data.pointsRedeemed is number
+        && data.staffId is string
+        && (!('shiftId' in data) || data.shiftId == null || data.shiftId is string)
+        && data.status in ['completed', 'voided']
+        && data.businessMeta is map
+        && data.createdAt is number;
+    }
+
+    function isValidPointsLedgerEntry(data) {
+      return data.keys().hasAll(['id', 'customerId', 'business', 'type', 'points', 'reason', 'createdAt'])
+        && data.id is string
+        && data.customerId is string
+        && data.business in ['wash', 'parts', 'drive', 'track']
+        && data.type in ['earn', 'redeem', 'referral_reward', 'adjustment']
+        && data.points is number
+        && (!('transactionId' in data) || data.transactionId == null || data.transactionId is string)
+        && data.reason is string && data.reason.size() <= 255
+        && data.createdAt is number;
+    }
+
+    function isValidStaff(data) {
+      return data.keys().hasAll(['id', 'name', 'role', 'businesses', 'active'])
+        && data.id is string
+        && data.name is string && data.name.size() <= 100
+        && data.role in ['attendant', 'supervisor', 'admin']
+        && data.businesses is list
+        && data.active is bool
+        && (!('pin' in data) || data.pin == null || data.pin is string);
+    }
+
+    function isValidShift(data) {
+      return data.keys().hasAll(['id', 'staffId', 'openedAt', 'openingFloat', 'expectedCash', 'expectedEcocash', 'expectedCard', 'status'])
+        && data.id is string
+        && data.staffId is string
+        && data.openedAt is number
+        && (!('closedAt' in data) || data.closedAt == null || data.closedAt is number)
+        && data.openingFloat is number
+        && data.expectedCash is number
+        && data.expectedEcocash is number
+        && data.expectedCard is number
+        && (!('countedCash' in data) || data.countedCash == null || data.countedCash is number)
+        && (!('variance' in data) || data.variance == null || data.variance is number)
+        && data.status in ['open', 'closed'];
+    }
+
+    function isValidReferralRedemption(data) {
+      return data.keys().hasAll(['id', 'referrerId', 'refereeId', 'business', 'rewardPoints', 'createdAt'])
+        && data.id is string
+        && data.referrerId is string
+        && data.refereeId is string
+        && data.business in ['wash', 'parts', 'drive', 'track']
+        && data.rewardPoints is number
+        && data.createdAt is number;
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['id', 'name', 'phone', 'vehicle', 'serviceType', 'requestedTime', 'status', 'createdAt'])
+        && data.id is string
+        && data.name is string && data.name.size() <= 100
+        && data.phone is string && data.phone.size() <= 20
+        && data.vehicle is string && data.vehicle.size() <= 100
+        && data.serviceType is string && data.serviceType.size() <= 50
+        && data.requestedTime is number
+        && data.status in ['pending', 'confirmed', 'done']
+        && data.createdAt is number;
+    }
+
+    function isValidSettings(data) {
+      return data.keys().hasAll(['id', 'pointsPerWash', 'referralRewardPoints', 'services'])
+        && data.id is string
+        && data.services is list
+        && data.pointsPerWash is number
+        && data.referralRewardPoints is number;
+    }
+
+    match /customers/{customerId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && isValidId(customerId) && isValidCustomer(incoming());
+      allow update: if isStaff() && isValidId(customerId) && isValidCustomer(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'vehicles', 'pointsBalance', 'tags', 'referralCode', 'referredByCode', 'updatedAt'])
+      );
+      allow delete: if isAdmin() && isValidId(customerId);
+    }
+
+    match /washMemberships/{membershipId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && isValidId(membershipId) && isValidWashMembership(incoming());
+      allow update: if isStaff() && isValidId(membershipId) && isValidWashMembership(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['tier', 'expiry'])
+      );
+      allow delete: if isAdmin() && isValidId(membershipId);
+    }
+
+    match /transactions/{transactionId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && isValidId(transactionId) && isValidTransaction(incoming());
+      allow update: if isStaff() && isValidId(transactionId) && isValidTransaction(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+      );
+      allow delete: if isAdmin() && isValidId(transactionId);
+    }
+
+    match /pointsLedger/{entryId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && isValidId(entryId) && isValidPointsLedgerEntry(incoming());
+      allow update: if false; // Append-only ledger
+      allow delete: if isAdmin() && isValidId(entryId);
+    }
+
+    match /staff/{staffId} {
+      allow get, list: if isStaff() || request.auth.uid == staffId;
+      allow create: if (isAdmin() || request.auth.uid == staffId) && isValidId(staffId) && isValidStaff(incoming());
+      allow update: if isAdmin() && isValidId(staffId) && isValidStaff(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'businesses', 'active', 'pin'])
+      );
+      allow delete: if isAdmin() && isValidId(staffId);
+    }
+
+    match /shifts/{shiftId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && isValidId(shiftId) && isValidShift(incoming());
+      allow update: if isStaff() && isValidId(shiftId) && isValidShift(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['closedAt', 'expectedCash', 'expectedEcocash', 'expectedCard', 'countedCash', 'variance', 'status'])
+      );
+      allow delete: if isAdmin() && isValidId(shiftId);
+    }
+
+    match /referralRedemptions/{redemptionId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && isValidId(redemptionId) && isValidReferralRedemption(incoming());
+      allow delete: if isAdmin() && isValidId(redemptionId);
+    }
+
+    match /bookings/{bookingId} {
+      allow get, list: if isStaff();
+      allow create: if isStaff() && isValidId(bookingId) && isValidBooking(incoming());
+      allow update: if isStaff() && isValidId(bookingId) && isValidBooking(incoming()) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['status', 'requestedTime', 'vehicle', 'serviceType', 'name', 'phone'])
+      );
+      allow delete: if isAdmin() && isValidId(bookingId);
+    }
+
+    match /settings/{settingsId} {
+      allow get, list: if isStaff();
+      allow create, update: if isAdmin() && isValidId(settingsId) && isValidSettings(incoming());
+      allow delete: if false; 
+    }
+  }
+}
