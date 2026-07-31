@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { formatCurrency } from '../lib/utils';
-import type { Shift, Transaction } from '../types';
+import { useStaff } from '../lib/auth';
+import { notifyLocalWrite } from '../lib/sync';
 
 export default function Shifts() {
+  const staff = useStaff();
   const [openingFloat, setOpeningFloat] = useState('');
   const [countedCash, setCountedCash] = useState('');
 
@@ -26,7 +28,7 @@ export default function Shifts() {
     const id = uuidv4();
     await db.shifts.add({
       id,
-      staffId: 'staff-1', // stub
+      staffId: staff.id,
       openedAt: Date.now(),
       openingFloat: parseFloat(openingFloat) || 0,
       expectedCash: parseFloat(openingFloat) || 0, // Starts with float
@@ -35,6 +37,7 @@ export default function Shifts() {
       status: 'open',
       syncStatus: 'pending_sync'
     });
+    void notifyLocalWrite();
     setOpeningFloat('');
   };
 
@@ -68,6 +71,7 @@ export default function Shifts() {
       status: 'closed',
       syncStatus: 'pending_sync'
     });
+    void notifyLocalWrite();
 
     setCountedCash('');
   };

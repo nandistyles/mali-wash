@@ -154,7 +154,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
 
     signOut: async () => {
-      sessionStorage.removeItem(DEV_SESSION_KEY);
+      // Guarded so no dev-session identifier survives into a production bundle.
+      if (DEV_LOGIN_ENABLED) sessionStorage.removeItem(DEV_SESSION_KEY);
       if (auth.currentUser) await fbSignOut(auth);
       setState({ status: 'signed_out' });
     }
