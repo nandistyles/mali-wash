@@ -21,7 +21,7 @@ export default function PublicBooking() {
     e.preventDefault();
     
     // Create timestamp from date and time
-    const dateTimeString = `\${formData.requestedDate}T\${formData.requestedTime}`;
+    const dateTimeString = `${formData.requestedDate}T${formData.requestedTime}`;
     const requestedTime = new Date(dateTimeString).getTime();
 
     const bookingId = uuidv4();

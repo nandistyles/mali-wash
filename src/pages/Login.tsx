@@ -1,37 +1,96 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signInWithPopup, GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
-import { auth } from '../lib/firebase';
+import { useAuth, DEV_LOGIN_ENABLED } from '../lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Car, LogIn } from 'lucide-react';
+import { Car, LogIn, TriangleAlert, Wrench } from 'lucide-react';
 
+/**
+ * Staff sign-in. Email/password per platform spec 4.1 — Google popup was
+ * replaced because a popup flow cannot complete without connectivity, and the
+ * till has to open on a load-shedding morning.
+ */
 export default function Login() {
+  const { state, signInWithEmail, signInAsDev, signOut } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (!auth) return;
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (user) navigate('/pos');
-    });
-    return unsub;
-  }, [navigate]);
+    if (state.status === 'ready') navigate('/pos', { replace: true });
+  }, [state.status, navigate]);
 
-  const handleGoogleLogin = async () => {
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
     try {
-      setLoading(true);
-      setError('');
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      navigate('/pos');
+      await signInWithEmail(email, password);
     } catch (err: any) {
-      setError(err.message || 'Failed to login with Google');
+      // Firebase error codes are not readable by a car wash attendant.
+      const code = err?.code || '';
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+        setError('Wrong email or password.');
+      } else if (code === 'auth/network-request-failed') {
+        setError('No connection. You must sign in online at least once on this device.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many attempts. Wait a minute and try again.');
+      } else {
+        setError(err?.message || 'Could not sign in.');
+      }
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   };
+
+  const handleDevLogin = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await signInAsDev();
+    } catch (err: any) {
+      setError(err?.message || 'Dev login failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Signed in to Firebase but with no staff record, the rules will reject every
+  // read. Say so plainly instead of bouncing back to a blank login form.
+  if (state.status === 'no_staff_record' || state.status === 'inactive') {
+    const isInactive = state.status === 'inactive';
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl border-2 border-amber-300">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-amber-700">
+              <TriangleAlert className="w-5 h-5" />
+              {isInactive ? 'Account deactivated' : 'No staff record'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-slate-600">
+              {isInactive
+                ? 'This account has been deactivated. Ask an admin to reactivate it.'
+                : 'You signed in, but there is no staff record for this account, so you have no access to any data.'}
+            </p>
+            {!isInactive && state.status === 'no_staff_record' && (
+              <p className="text-xs text-slate-500 font-mono bg-slate-100 p-3 rounded border break-all">
+                An admin must create a document in the <b>staff</b> collection with the id:
+                <br />
+                <b className="text-slate-800">{state.user.uid}</b>
+              </p>
+            )}
+            <Button onClick={() => signOut()} variant="outline" className="w-full">
+              Sign out
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -48,23 +107,68 @@ export default function Login() {
           <CardTitle className="text-center text-xl">Sign In</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="p-3 bg-red-50 text-red-700 text-sm rounded-md border border-red-200">
                 {error}
               </div>
             )}
-            
-            <Button 
-              onClick={handleGoogleLogin} 
-              className="w-full h-12 mt-2 flex items-center gap-2" 
-              disabled={loading}
-              variant="outline"
-            >
+
+            <div>
+              <label htmlFor="email" className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                Email
+              </label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="username"
+                required
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                className="w-full h-12 px-3 border-2 border-slate-200 rounded-md focus:border-teal-500 focus:outline-none text-base"
+                placeholder="you@maliwash.co.zw"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="password" className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full h-12 px-3 border-2 border-slate-200 rounded-md focus:border-teal-500 focus:outline-none text-base"
+                placeholder="••••••••"
+              />
+            </div>
+
+            <Button type="submit" className="w-full h-12 flex items-center gap-2" disabled={busy}>
               <LogIn className="w-5 h-5" />
-              {loading ? 'Signing in...' : 'Sign in with Google'}
+              {busy ? 'Signing in…' : 'Sign In'}
             </Button>
-          </div>
+
+            {DEV_LOGIN_ENABLED && (
+              <div className="pt-4 mt-4 border-t border-dashed border-slate-300">
+                <Button
+                  type="button"
+                  onClick={handleDevLogin}
+                  variant="outline"
+                  disabled={busy}
+                  className="w-full h-12 flex items-center gap-2 border-amber-400 text-amber-700 hover:bg-amber-50"
+                >
+                  <Wrench className="w-5 h-5" />
+                  Continue as Dev Admin
+                </Button>
+                <p className="text-[11px] text-slate-500 text-center mt-2">
+                  Local development only — this button does not exist in a production build.
+                </p>
+              </div>
+            )}
+          </form>
         </CardContent>
       </Card>
     </div>

@@ -6,9 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { formatCurrency } from '../lib/utils';
-import type { Shift, Transaction } from '../types';
+import { useStaff } from '../lib/auth';
+import { notifyLocalWrite } from '../lib/sync';
 
 export default function Shifts() {
+  const staff = useStaff();
   const [openingFloat, setOpeningFloat] = useState('');
   const [countedCash, setCountedCash] = useState('');
 
@@ -26,7 +28,7 @@ export default function Shifts() {
     const id = uuidv4();
     await db.shifts.add({
       id,
-      staffId: 'staff-1', // stub
+      staffId: staff.id,
       openedAt: Date.now(),
       openingFloat: parseFloat(openingFloat) || 0,
       expectedCash: parseFloat(openingFloat) || 0, // Starts with float
@@ -35,6 +37,7 @@ export default function Shifts() {
       status: 'open',
       syncStatus: 'pending_sync'
     });
+    void notifyLocalWrite();
     setOpeningFloat('');
   };
 
@@ -68,6 +71,7 @@ export default function Shifts() {
       status: 'closed',
       syncStatus: 'pending_sync'
     });
+    void notifyLocalWrite();
 
     setCountedCash('');
   };
@@ -81,7 +85,7 @@ export default function Shifts() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Active Shift Card */}
-        <Card className={`border-2 \${activeShift ? 'border-teal-500' : 'border-slate-200'}`}>
+        <Card className={`border-2 ${activeShift ? 'border-teal-500' : 'border-slate-200'}`}>
           <CardHeader className={activeShift ? 'bg-teal-50' : ''}>
             <CardTitle>{activeShift ? 'Active Shift' : 'No Active Shift'}</CardTitle>
           </CardHeader>
@@ -192,7 +196,7 @@ export default function Shifts() {
                     </div>
                     <div className="col-span-2 mt-1">
                       <span className="text-slate-400 text-xs uppercase block">Variance</span>
-                      <span className={`font-bold \${
+                      <span className={`font-bold ${
                         (shift.variance || 0) === 0 ? 'text-teal-600' : 'text-red-500'
                       }`}>
                         {formatCurrency(shift.variance || 0)}

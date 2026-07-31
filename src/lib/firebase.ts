@@ -1,11 +1,55 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import appletConfig from '../../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+/**
+ * Firebase config resolution.
+ *
+ * Environment variables win, so a real Mali-owned Firebase project can be
+ * configured per environment without editing source. The bundled
+ * firebase-applet-config.json is the fallback and points at the original AI
+ * Studio scratch project — fine for local development, not where customer data
+ * should live.
+ */
+const env = import.meta.env;
+
+const fromEnv = {
+  apiKey: env.VITE_FIREBASE_API_KEY,
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: env.VITE_FIREBASE_APP_ID
+};
+
+const usingEnv = Boolean(fromEnv.apiKey && fromEnv.projectId && fromEnv.appId);
+
+const firebaseConfig = usingEnv ? fromEnv : appletConfig;
+
+/**
+ * This project uses a NAMED Firestore database, not the default one. Getting
+ * this wrong silently reads and writes an empty default database.
+ */
+const databaseId: string =
+  env.VITE_FIREBASE_DATABASE_ID || (usingEnv ? '(default)' : appletConfig.firestoreDatabaseId);
+
+export const isUsingEnvConfig = usingEnv;
+export const firestoreDatabaseId = databaseId;
+
+const app = initializeApp(firebaseConfig as Record<string, string>);
+
+export const db = getFirestore(app, databaseId);
 export const auth = getAuth(app);
+
+/**
+ * Persist the session in IndexedDB so a staff member who signed in yesterday is
+ * still signed in this morning with no connectivity. Without this, a
+ * load-shedding morning locks the till out entirely.
+ */
+setPersistence(auth, browserLocalPersistence).catch(err => {
+  console.warn('Could not set auth persistence:', err);
+});
 
 export enum OperationType {
   CREATE = 'create',
