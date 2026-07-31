@@ -1,168 +1,174 @@
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../lib/db';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { formatCurrency } from '../lib/utils';
-import { TrendingUp, Users, DollarSign, Activity, CreditCard, Banknote, Smartphone } from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { computeMetrics, dailyRevenue, type BusinessMetrics } from '../lib/growth';
+import { formatCurrency } from '../lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import {
+  DollarSign, Receipt, Users, Repeat, CreditCard, Star, TriangleAlert, Banknote, Smartphone
+} from 'lucide-react';
+
+const DAY = 24 * 60 * 60 * 1000;
+const PERIODS = [
+  { days: 7, label: '7 days' },
+  { days: 30, label: '30 days' },
+  { days: 90, label: '90 days' },
+];
+
+function Stat({ icon: Icon, label, value, sub, tone = 'default' }: {
+  icon: typeof DollarSign;
+  label: string;
+  value: string;
+  sub?: string;
+  tone?: 'default' | 'good' | 'warn';
+}) {
+  const toneClass =
+    tone === 'good' ? 'text-teal-700' :
+    tone === 'warn' ? 'text-amber-700' :
+    'text-slate-900';
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center gap-2 text-slate-500 mb-2">
+          <Icon className="w-4 h-4" />
+          <span className="text-[11px] font-bold uppercase tracking-wider">{label}</span>
+        </div>
+        <div className={`text-2xl font-black ${toneClass}`}>{value}</div>
+        {sub && <div className="text-xs text-slate-500 mt-1">{sub}</div>}
+      </CardContent>
+    </Card>
+  );
+}
 
 export default function Dashboard() {
-  const transactions = useLiveQuery(() => db.transactions.toArray());
-  const customers = useLiveQuery(() => db.customers.toArray());
+  const [days, setDays] = useState(30);
+  const [metrics, setMetrics] = useState<BusinessMetrics | null>(null);
+  const [chart, setChart] = useState<{ date: string; amount: number; visits: number }[]>([]);
 
-  // Aggregate stats
-  const totalRevenue = transactions?.reduce((sum, t) => sum + (t.status === 'completed' ? t.amount : 0), 0) || 0;
-  const washCount = transactions?.filter(t => t.status === 'completed' && t.amount > 0).length || 0;
-  
-  const byPayment = {
-    cash_usd: transactions?.reduce((sum, t) => sum + (t.status === 'completed' && t.paymentMethod === 'cash_usd' ? t.amount : 0), 0) || 0,
-    ecocash: transactions?.reduce((sum, t) => sum + (t.status === 'completed' && t.paymentMethod === 'ecocash' ? t.amount : 0), 0) || 0,
-    card: transactions?.reduce((sum, t) => sum + (t.status === 'completed' && t.paymentMethod === 'card' ? t.amount : 0), 0) || 0,
-  };
+  useEffect(() => {
+    let cancelled = false;
+    void Promise.all([
+      computeMetrics(Date.now() - days * DAY),
+      dailyRevenue(Math.min(days, 30))
+    ]).then(([m, c]) => {
+      if (cancelled) return;
+      setMetrics(m);
+      setChart(c);
+    });
+    return () => { cancelled = true; };
+  }, [days]);
 
-  const totalCustomers = customers?.length || 0;
-  const members = customers?.filter(c => c.tags?.includes('wash_member')).length || 0;
-
-  // Chart data: Group revenue by payment method for simple visualization
-  const chartData = [
-    { name: 'Cash', amount: byPayment.cash_usd, fill: '#10b981' },
-    { name: 'EcoCash', amount: byPayment.ecocash, fill: '#3b82f6' },
-    { name: 'Card', amount: byPayment.card, fill: '#a855f7' }
-  ];
+  const methodTotal = metrics
+    ? metrics.byPaymentMethod.cash_usd + metrics.byPaymentMethod.ecocash + metrics.byPaymentMethod.card
+    : 0;
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto h-full w-full p-6 overflow-auto bg-slate-50">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-        <p className="text-slate-500">Overview of wash operations</p>
-      </div>
+    <div className="h-full w-full overflow-auto bg-slate-50 p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
+            <p className="text-slate-500">How the wash is actually doing.</p>
+          </div>
+          <div className="flex gap-1 bg-white border-2 border-slate-200 rounded-lg p-1">
+            {PERIODS.map(p => (
+              <button
+                key={p.days}
+                onClick={() => setDays(p.days)}
+                className={`px-3 py-1.5 rounded text-sm font-bold transition-colors ${
+                  days === p.days ? 'bg-[#004D4D] text-white' : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="shadow-sm border-slate-200">
-          <CardContent className="p-6 flex items-center space-x-4">
-            <div className="p-3 bg-teal-100 text-teal-700 rounded-xl">
-              <DollarSign className="w-6 h-6" />
+        {!metrics ? (
+          <Card><CardContent className="p-12 text-center text-slate-500">Reading the ledger…</CardContent></Card>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Stat icon={DollarSign} label="Revenue" value={formatCurrency(metrics.revenue)}
+                sub={`${metrics.transactionCount} sales`} tone="good" />
+              <Stat icon={Receipt} label="Average ticket" value={formatCurrency(metrics.averageTicket)} />
+              <Stat icon={Users} label="New customers" value={String(metrics.newCustomers)}
+                sub={`in the last ${days} days`} />
+              <Stat icon={Repeat} label="Repeat rate" value={`${Math.round(metrics.repeatRate * 100)}%`}
+                sub="customers who came back"
+                tone={metrics.repeatRate >= 0.4 ? 'good' : 'warn'} />
             </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500">Total Revenue</p>
-              <h3 className="text-2xl font-black text-slate-900">{formatCurrency(totalRevenue)}</h3>
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card className="shadow-sm border-slate-200">
-          <CardContent className="p-6 flex items-center space-x-4">
-            <div className="p-3 bg-blue-100 text-blue-700 rounded-xl">
-              <Activity className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500">Sales Volume</p>
-              <h3 className="text-2xl font-black text-slate-900">{washCount}</h3>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="shadow-sm border-slate-200">
-          <CardContent className="p-6 flex items-center space-x-4">
-            <div className="p-3 bg-purple-100 text-purple-700 rounded-xl">
-              <Users className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500">Total Customers</p>
-              <h3 className="text-2xl font-black text-slate-900">{totalCustomers}</h3>
-            </div>
-          </CardContent>
-        </Card>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {/* Payment split drives till reconciliation — you cannot check a
+                  drawer against a single blended revenue number. */}
+              <Card className="lg:col-span-1">
+                <CardHeader><CardTitle className="text-base">Payment split</CardTitle></CardHeader>
+                <CardContent className="p-5 pt-0 space-y-3">
+                  {[
+                    { key: 'cash_usd' as const, label: 'Cash USD', icon: Banknote, colour: 'bg-emerald-500' },
+                    { key: 'ecocash' as const, label: 'EcoCash', icon: Smartphone, colour: 'bg-blue-500' },
+                    { key: 'card' as const, label: 'Card', icon: CreditCard, colour: 'bg-purple-500' },
+                  ].map(m => {
+                    const amount = metrics.byPaymentMethod[m.key];
+                    const pct = methodTotal > 0 ? (amount / methodTotal) * 100 : 0;
+                    return (
+                      <div key={m.key}>
+                        <div className="flex justify-between items-center text-sm mb-1">
+                          <span className="flex items-center gap-2 text-slate-600">
+                            <m.icon className="w-3.5 h-3.5" /> {m.label}
+                          </span>
+                          <span className="font-bold text-slate-900">{formatCurrency(amount)}</span>
+                        </div>
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div className={`h-full ${m.colour}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </CardContent>
+              </Card>
 
-        <Card className="shadow-sm border-slate-200">
-          <CardContent className="p-6 flex items-center space-x-4">
-            <div className="p-3 bg-amber-100 text-amber-700 rounded-xl">
-              <TrendingUp className="w-6 h-6" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-500">Active Members</p>
-              <h3 className="text-2xl font-black text-slate-900">{members}</h3>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="shadow-sm border-slate-200 flex flex-col">
-          <CardHeader>
-            <CardTitle className="text-lg">Revenue by Payment Method</CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 flex flex-col">
-            <div className="grid grid-cols-3 gap-2 mb-6">
-              <div className="bg-emerald-50 p-3 rounded-lg border border-emerald-100 text-center">
-                <Banknote className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
-                <div className="text-xs text-emerald-800 font-semibold uppercase">Cash</div>
-                <div className="font-black text-emerald-900">{formatCurrency(byPayment.cash_usd)}</div>
-              </div>
-              <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 text-center">
-                <Smartphone className="w-5 h-5 text-blue-600 mx-auto mb-1" />
-                <div className="text-xs text-blue-800 font-semibold uppercase">EcoCash</div>
-                <div className="font-black text-blue-900">{formatCurrency(byPayment.ecocash)}</div>
-              </div>
-              <div className="bg-purple-50 p-3 rounded-lg border border-purple-100 text-center">
-                <CreditCard className="w-5 h-5 text-purple-600 mx-auto mb-1" />
-                <div className="text-xs text-purple-800 font-semibold uppercase">Card</div>
-                <div className="font-black text-purple-900">{formatCurrency(byPayment.card)}</div>
-              </div>
-            </div>
-            
-            <div className="flex-1 min-h-[200px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} tickFormatter={(val) => `$${val}`} />
-                  <Tooltip 
-                    cursor={{fill: '#f1f5f9'}}
-                    contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
-                    formatter={(value: number) => [formatCurrency(value), 'Revenue']}
-                  />
-                  <Bar dataKey="amount" radius={[4, 4, 0, 0]} fill="#0f766e" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader>
-            <CardTitle className="text-lg">Recent Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="divide-y divide-slate-100">
-              {transactions?.slice(-7).reverse().map(t => (
-                <div key={t.id} className="py-3 flex justify-between items-center">
-                  <div>
-                    <div className="font-semibold text-slate-900">
-                      {t.lineItems.length > 1 ? `${t.lineItems.length} items` : t.lineItems[0]?.description || 'Sale'}
-                    </div>
-                    <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                      <span>{new Date(t.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                      <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                      <span className="uppercase font-medium">{t.paymentMethod.replace('_', ' ')}</span>
-                      {t.pointsEarned > 0 && (
-                        <>
-                          <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                          <span className="text-teal-600 font-medium">+{t.pointsEarned} pts</span>
-                        </>
-                      )}
-                    </div>
+              <Card className="lg:col-span-2">
+                <CardHeader><CardTitle className="text-base">Daily revenue</CardTitle></CardHeader>
+                <CardContent className="p-5 pt-0">
+                  <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chart}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                        <XAxis dataKey="date" tick={{ fontSize: 11 }} interval="preserveStartEnd" />
+                        <YAxis tick={{ fontSize: 11 }} width={45} />
+                        <Tooltip
+                          formatter={(v: number) => formatCurrency(v)}
+                          contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }}
+                        />
+                        <Bar dataKey="amount" radius={[4, 4, 0, 0]} fill="#0f766e" />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </div>
-                  <div className="font-black text-slate-900">{formatCurrency(t.amount)}</div>
-                </div>
-              ))}
-              {(!transactions || transactions.length === 0) && (
-                <div className="py-8 text-center text-slate-400 text-sm italic">
-                  No transactions yet.<br/>Head to the POS to make a sale.
-                </div>
-              )}
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <Stat icon={CreditCard} label="Active memberships" value={String(metrics.activeMemberships)}
+                sub={`${formatCurrency(metrics.membershipMrr)} recurring / month`} tone="good" />
+              <Stat icon={DollarSign} label="Returning-customer revenue"
+                value={formatCurrency(metrics.returningCustomerRevenue)}
+                sub={metrics.revenue > 0
+                  ? `${Math.round((metrics.returningCustomerRevenue / metrics.revenue) * 100)}% of revenue`
+                  : undefined} />
+              {/* Outstanding points are a real liability, not a vanity metric:
+                  every one is a discount you have already sold. */}
+              <Stat icon={Star} label="Points liability" value={formatCurrency(metrics.pointsLiabilityUsd)}
+                sub="if every point were redeemed"
+                tone={metrics.pointsLiabilityUsd > metrics.revenue * 0.15 ? 'warn' : 'default'} />
+              <Stat icon={TriangleAlert} label="Voided" value={String(metrics.voidedCount)}
+                sub={formatCurrency(metrics.voidedValue)}
+                tone={metrics.voidedCount > 0 ? 'warn' : 'default'} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

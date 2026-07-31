@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSync } from '../lib/sync';
 import { useAuth } from '../lib/auth';
-import { Car, Users, LayoutDashboard, Settings as SettingsIcon, Clock, LogOut, Calendar, TriangleAlert, RefreshCw } from 'lucide-react';
+import { Car, Users, LayoutDashboard, Settings as SettingsIcon, Clock, LogOut, Calendar, TriangleAlert, RefreshCw, TrendingUp } from 'lucide-react';
 
 export default function Layout() {
   const { isOnline, syncing, lastSync, pendingCount, lastError, triggerSync } = useSync();
@@ -21,6 +21,7 @@ export default function Layout() {
     { path: '/customers', label: 'Customers', icon: Users },
     { path: '/shifts', label: 'Shifts', icon: Clock },
     { path: '/bookings', label: 'Bookings', icon: Calendar },
+    { path: '/growth', label: 'Growth', icon: TrendingUp },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     ...(isAdmin ? [{ path: '/settings', label: 'Settings', icon: SettingsIcon }] : []),
   ];

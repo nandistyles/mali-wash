@@ -11,6 +11,7 @@ import POS from './pages/POS';
 import Customers from './pages/Customers';
 import Shifts from './pages/Shifts';
 import Dashboard from './pages/Dashboard';
+import Growth from './pages/Growth';
 import Settings from './pages/Settings';
 import Bookings from './pages/Bookings';
 import PublicBooking from './pages/PublicBooking';
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="customers" element={<Customers />} />
             <Route path="shifts" element={<Shifts />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="growth" element={<Growth />} />
             <Route path="bookings" element={<Bookings />} />
             <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
           </Route>
