@@ -11,7 +11,10 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+        // Must match what actually exists in public/ — the previous list named a
+        // favicon.ico that was never in the repo, and the manifest pointed at
+        // icons that 404'd in production.
+        includeAssets: ['favicon.svg', 'favicon-48x48.png', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
           name: 'Mali Wash',
           short_name: 'Mali Wash',

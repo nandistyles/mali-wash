@@ -1,24 +1,39 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
-import appletConfig from '../../firebase-applet-config.json';
-
 /**
  * Firebase config resolution.
  *
- * The bundled firebase-applet-config.json points at gen-lang-client-0971315086,
- * an AI Studio project that belongs to a DIFFERENT application. It is kept only
- * so the app can boot without configuration; it must never receive Mali Wash
- * customer data.
+ * Configuration comes from VITE_FIREBASE_* and nowhere else.
  *
- * So the fallback initialises Firebase (the SDK needs *something* to construct
- * an app object) but does NOT count as being configured. `isFirebaseConfigured`
- * is false unless VITE_FIREBASE_* are set explicitly, and sync.ts refuses to
- * push or pull anything while it is false. Dexie remains the source of truth,
- * so the app stays fully usable offline — it just does not write someone else's
- * database.
+ * This used to fall back to a bundled firebase-applet-config.json pointing at
+ * gen-lang-client-0971315086 — an AI Studio project belonging to a DIFFERENT
+ * application. Even unused, a static import puts that project's id and key in
+ * every bundle we ship, and a build with no env vars silently authenticated
+ * against it. That happened in production: a Vercel deploy with no variables set
+ * shipped the fallback key and rejected valid staff passwords, because the
+ * accounts existed in maliholdings and the app was asking the wrong project.
+ *
+ * There is now no fallback project. When the variables are absent the SDK is
+ * constructed from an inert placeholder purely so imports resolve and the app
+ * boots; `isFirebaseConfigured` is false, sync refuses to push or pull, and a
+ * production build renders a configuration error instead of the app. Dexie is
+ * the source of truth regardless, so local work is never blocked.
  */
 const env = import.meta.env;
+
+/**
+ * Not a real project. Only ever used to satisfy initializeApp() when nothing is
+ * configured; every network path is gated on isFirebaseConfigured.
+ */
+const PLACEHOLDER = {
+  apiKey: 'unconfigured',
+  authDomain: 'unconfigured.invalid',
+  projectId: 'unconfigured',
+  storageBucket: 'unconfigured.invalid',
+  messagingSenderId: '0',
+  appId: '0:0:web:0'
+};
 
 const fromEnv = {
   apiKey: env.VITE_FIREBASE_API_KEY,
@@ -31,20 +46,18 @@ const fromEnv = {
 
 const usingEnv = Boolean(fromEnv.apiKey && fromEnv.projectId && fromEnv.appId);
 
-const firebaseConfig = usingEnv ? fromEnv : appletConfig;
+const firebaseConfig = usingEnv ? fromEnv : PLACEHOLDER;
 
 /**
  * Firestore supports NAMED databases alongside the default one. Point this at
  * whatever the Mali project uses; getting it wrong reads and writes a different
  * database with no error at all.
  */
-const databaseId: string =
-  env.VITE_FIREBASE_DATABASE_ID || (usingEnv ? '(default)' : appletConfig.firestoreDatabaseId);
+const databaseId: string = env.VITE_FIREBASE_DATABASE_ID || '(default)';
 
 /**
- * True only when a project has been named explicitly. Sync is gated on this so
- * an unconfigured install cannot leak customer records into the AI Studio
- * project that ships in the fallback config.
+ * True only when a project has been named explicitly. Every network path is
+ * gated on this.
  */
 export const isFirebaseConfigured = usingEnv;
 export const configuredProjectId: string = firebaseConfig.projectId;
@@ -52,9 +65,8 @@ export const firestoreDatabaseId = databaseId;
 
 if (!usingEnv) {
   console.warn(
-    `[Mali] Firebase is NOT configured for Mali Wash.\n` +
-    `Falling back to ${appletConfig.projectId}, which belongs to a different application.\n` +
-    `Sync is disabled — all data stays in this browser until you set VITE_FIREBASE_* in .env.local.`
+    `[Mali] Firebase is NOT configured.\n` +
+    `Set VITE_FIREBASE_* (see .env.example). Sync is disabled — all data stays in this browser.`
   );
 }
 
