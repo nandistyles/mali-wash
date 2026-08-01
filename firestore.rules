@@ -214,7 +214,7 @@ service cloud.firestore {
         isAdmin() || (
           isSignedIn()
           && request.auth.uid == staffId
-          && staffId == 'UbsprL62ZCQtXURhT8q0EEnS5k32'
+          && staffId == 'BYlc3JPiRhaBtlDjx87qhjealvG2'
           && incoming().role == 'admin'
           && incoming().active == true
         )

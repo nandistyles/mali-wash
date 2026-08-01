@@ -52,7 +52,7 @@ const DEV_SESSION_KEY = 'mali_dev_session';
  * whether to offer the button. Both should be removed once the staff record
  * exists.
  */
-export const BOOTSTRAP_ADMIN_UID = 'UbsprL62ZCQtXURhT8q0EEnS5k32';
+export const BOOTSTRAP_ADMIN_UID = 'BYlc3JPiRhaBtlDjx87qhjealvG2'; // michaelc@team.co.zw
 
 export type AuthState =
   | { status: 'loading' }
