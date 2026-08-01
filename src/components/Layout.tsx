@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth';
 import { Car, Users, LayoutDashboard, Settings as SettingsIcon, Clock, LogOut, Calendar, TriangleAlert, RefreshCw, TrendingUp } from 'lucide-react';
 
 export default function Layout() {
-  const { isOnline, syncing, lastSync, pendingCount, lastError, configured, triggerSync } = useSync();
+  const { isOnline, syncing, lastSync, pendingCount, lastError, configured, signedIn, triggerSync } = useSync();
   const { staff, isAdmin, signOut, state } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -34,6 +34,8 @@ export default function Layout() {
    */
   const status = !configured
     ? { dot: 'bg-slate-400', label: pendingCount > 0 ? `Local only · ${pendingCount}` : 'Local only' }
+    : !signedIn
+    ? { dot: 'bg-slate-400', label: pendingCount > 0 ? `Not syncing · ${pendingCount}` : 'Not syncing' }
     : !isOnline
     ? { dot: 'bg-amber-400', label: pendingCount > 0 ? `Offline · ${pendingCount} queued` : 'Offline' }
     : lastError
@@ -95,6 +97,20 @@ export default function Layout() {
             <b>Local only — no Mali Firebase project configured.</b> Everything works and nothing is lost,
             but this device is not backed up and no other device can see it. Set <code className="bg-slate-200 px-1 rounded">VITE_FIREBASE_*</code> in <code className="bg-slate-200 px-1 rounded">.env.local</code> to turn sync on.
             {pendingCount > 0 && <> {pendingCount} record{pendingCount === 1 ? '' : 's'} waiting.</>}
+          </span>
+        </div>
+      )}
+
+      {/* A dev session has no Firebase account, so it can never sync. Say so
+          plainly rather than letting it look like an outage. */}
+      {configured && !signedIn && isDevSession && (
+        <div className="bg-amber-50 border-b-2 border-amber-200 px-6 py-2 flex items-center gap-3 text-sm text-amber-900 shrink-0">
+          <TriangleAlert className="w-4 h-4 shrink-0" />
+          <span className="flex-1">
+            <b>Dev session — not syncing.</b> This login has no Firebase account, so nothing reaches
+            the <code className="bg-amber-100 px-1 rounded">maliholdings</code> project. Sign in with a real staff
+            email to sync.
+            {pendingCount > 0 && <> {pendingCount} record{pendingCount === 1 ? '' : 's'} queued locally.</>}
           </span>
         </div>
       )}

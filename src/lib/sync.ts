@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { db } from './db';
-import { db as firestore, isFirebaseConfigured } from './firebase';
+import { db as firestore, auth, isFirebaseConfigured } from './firebase';
 import { collection, doc, writeBatch, getDocs, query, where } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 /**
  * Offline-first sync (platform spec 4.2).
@@ -76,6 +77,12 @@ export interface SyncState {
   lastError: string | null;
   /** False when no Mali Firebase project is configured; sync is then a no-op. */
   configured: boolean;
+  /**
+   * False when there is no Firebase identity — signed out, or a dev-bypass
+   * session, which is local-only by design. The rules reject every read without
+   * a staff document behind an Auth uid, so syncing is not attempted.
+   */
+  signedIn: boolean;
 }
 
 let state: SyncState = {
@@ -84,7 +91,8 @@ let state: SyncState = {
   lastSync: null,
   pendingCount: 0,
   lastError: null,
-  configured: isFirebaseConfigured
+  configured: isFirebaseConfigured,
+  signedIn: false
 };
 
 const subscribers = new Set<(s: SyncState) => void>();
@@ -180,10 +188,28 @@ export async function performSync(): Promise<void> {
   if (!isFirebaseConfigured) {
     setState({
       pendingCount: await countPending(),
-      lastError: null
+      lastError: null,
+      signedIn: false
     });
     return;
   }
+
+  /*
+   * No Firebase identity means every rule evaluates against request.auth == null
+   * and rejects. That is the normal state for a dev-bypass session, which has no
+   * Firebase account at all. Attempting anyway would fill the header with
+   * permission-denied errors that are not actually faults.
+   */
+  if (!auth.currentUser) {
+    setState({
+      pendingCount: await countPending(),
+      lastError: null,
+      signedIn: false
+    });
+    return;
+  }
+
+  setState({ signedIn: true });
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     setState({ pendingCount: await countPending() });
@@ -243,6 +269,10 @@ let started = false;
 function startSyncEngine() {
   if (started || typeof window === 'undefined') return;
   started = true;
+
+  // Signing in is the moment a queued backlog becomes syncable, so push then
+  // rather than waiting up to a minute for the next timer tick.
+  onAuthStateChanged(auth, () => { void performSync(); });
 
   window.addEventListener('online', () => {
     setState({ isOnline: true });
