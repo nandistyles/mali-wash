@@ -201,8 +201,24 @@ service cloud.firestore {
       // their own role before any other rule can be evaluated).
       allow get: if isSignedIn() && request.auth.uid == staffId;
       allow list: if isStaff();
-      // No self-create: admins provision staff, console provisions the first admin.
-      allow create: if isAdmin() && isValidId(staffId) && isValidStaff(incoming());
+      // No general self-create — that was the privilege-escalation hole: any
+      // signed-in account could mint itself role: 'admin'.
+      //
+      // Bootstrapping is a genuine chicken-and-egg problem: an admin must exist
+      // before an admin can create one. Rather than leave a self-create path
+      // open, exactly one known uid may create exactly its own document. Anyone
+      // else is refused, including that uid creating a document for someone
+      // else. This is a ladder, not a door — delete the clause once the record
+      // exists and redeploy.
+      allow create: if isValidId(staffId) && isValidStaff(incoming()) && (
+        isAdmin() || (
+          isSignedIn()
+          && request.auth.uid == staffId
+          && staffId == 'UbsprL62ZCQtXURhT8q0EEnS5k32'
+          && incoming().role == 'admin'
+          && incoming().active == true
+        )
+      );
       allow update: if isAdmin() && isValidId(staffId) && isValidStaff(incoming()) && (
         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'businesses', 'active', 'pin'])
       );
