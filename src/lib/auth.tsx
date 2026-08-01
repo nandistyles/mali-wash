@@ -5,7 +5,7 @@ import {
   signOut as fbSignOut,
   type User
 } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db as firestore } from './firebase';
 import { db } from './db';
 import type { Staff } from '../types';
@@ -46,6 +46,14 @@ const DEV_STAFF: Staff = {
 
 const DEV_SESSION_KEY = 'mali_dev_session';
 
+/**
+ * The founding admin's uid. Must match the bootstrap clause in firestore.rules —
+ * the rules are what actually enforce this; the constant here only decides
+ * whether to offer the button. Both should be removed once the staff record
+ * exists.
+ */
+export const BOOTSTRAP_ADMIN_UID = 'BYlc3JPiRhaBtlDjx87qhjealvG2'; // michaelc@team.co.zw
+
 export type AuthState =
   | { status: 'loading' }
   | { status: 'signed_out' }
@@ -60,6 +68,8 @@ interface AuthContextValue {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signInAsDev: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** One-time provisioning of the founding admin. See BOOTSTRAP_ADMIN_UID. */
+  provisionBootstrapAdmin: (name: string) => Promise<void>;
   canOperate: (business: string) => boolean;
   isAdmin: boolean;
 }
@@ -151,6 +161,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await db.staff.put(DEV_STAFF);
       sessionStorage.setItem(DEV_SESSION_KEY, 'true');
       setState({ status: 'ready', staff: DEV_STAFF, user: null, isDevSession: true });
+    },
+
+    provisionBootstrapAdmin: async (name: string) => {
+      const user = auth.currentUser;
+      if (!user) throw new Error('Sign in first');
+      if (user.uid !== BOOTSTRAP_ADMIN_UID) {
+        throw new Error('This account is not the founding admin');
+      }
+
+      const staff: Staff = {
+        id: user.uid,
+        name: name.trim() || 'Admin',
+        email: user.email,
+        role: 'admin',
+        businesses: ['wash'],
+        active: true
+      };
+
+      // Write to Firestore first: if the rules refuse, we must not end up with a
+      // local record that makes the app look provisioned when it is not.
+      await setDoc(doc(firestore, 'staff', user.uid), staff);
+      await db.staff.put({ ...staff, syncStatus: 'synced' });
+
+      setState({ status: 'ready', staff, user, isDevSession: false });
     },
 
     signOut: async () => {

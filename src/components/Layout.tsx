@@ -1,10 +1,10 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSync } from '../lib/sync';
 import { useAuth } from '../lib/auth';
-import { Car, Users, LayoutDashboard, Settings as SettingsIcon, Clock, LogOut, Calendar, TriangleAlert, RefreshCw } from 'lucide-react';
+import { Car, Users, LayoutDashboard, Settings as SettingsIcon, Clock, LogOut, Calendar, TriangleAlert, RefreshCw, TrendingUp } from 'lucide-react';
 
 export default function Layout() {
-  const { isOnline, syncing, lastSync, pendingCount, lastError, triggerSync } = useSync();
+  const { isOnline, syncing, lastSync, pendingCount, lastError, configured, signedIn, triggerSync } = useSync();
   const { staff, isAdmin, signOut, state } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -21,6 +21,7 @@ export default function Layout() {
     { path: '/customers', label: 'Customers', icon: Users },
     { path: '/shifts', label: 'Shifts', icon: Clock },
     { path: '/bookings', label: 'Bookings', icon: Calendar },
+    { path: '/growth', label: 'Growth', icon: TrendingUp },
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     ...(isAdmin ? [{ path: '/settings', label: 'Settings', icon: SettingsIcon }] : []),
   ];
@@ -31,7 +32,11 @@ export default function Layout() {
    * rejected. It now distinguishes connected, queued, and failing, because on
    * this network those are three different situations and only one is fine.
    */
-  const status = !isOnline
+  const status = !configured
+    ? { dot: 'bg-slate-400', label: pendingCount > 0 ? `Local only · ${pendingCount}` : 'Local only' }
+    : !signedIn
+    ? { dot: 'bg-slate-400', label: pendingCount > 0 ? `Not syncing · ${pendingCount}` : 'Not syncing' }
+    : !isOnline
     ? { dot: 'bg-amber-400', label: pendingCount > 0 ? `Offline · ${pendingCount} queued` : 'Offline' }
     : lastError
       ? { dot: 'bg-red-400', label: 'Sync failing' }
@@ -83,8 +88,35 @@ export default function Layout() {
         </div>
       </header>
 
+      {/* No Mali project configured: sync is deliberately switched off so records
+          cannot land in the AI Studio project the fallback config points at. */}
+      {!configured && (
+        <div className="bg-slate-100 border-b-2 border-slate-300 px-6 py-2 flex items-center gap-3 text-sm text-slate-700 shrink-0">
+          <TriangleAlert className="w-4 h-4 shrink-0" />
+          <span className="flex-1">
+            <b>Local only — no Mali Firebase project configured.</b> Everything works and nothing is lost,
+            but this device is not backed up and no other device can see it. Set <code className="bg-slate-200 px-1 rounded">VITE_FIREBASE_*</code> in <code className="bg-slate-200 px-1 rounded">.env.local</code> to turn sync on.
+            {pendingCount > 0 && <> {pendingCount} record{pendingCount === 1 ? '' : 's'} waiting.</>}
+          </span>
+        </div>
+      )}
+
+      {/* A dev session has no Firebase account, so it can never sync. Say so
+          plainly rather than letting it look like an outage. */}
+      {configured && !signedIn && isDevSession && (
+        <div className="bg-amber-50 border-b-2 border-amber-200 px-6 py-2 flex items-center gap-3 text-sm text-amber-900 shrink-0">
+          <TriangleAlert className="w-4 h-4 shrink-0" />
+          <span className="flex-1">
+            <b>Dev session — not syncing.</b> This login has no Firebase account, so nothing reaches
+            the <code className="bg-amber-100 px-1 rounded">maliholdings</code> project. Sign in with a real staff
+            email to sync.
+            {pendingCount > 0 && <> {pendingCount} record{pendingCount === 1 ? '' : 's'} queued locally.</>}
+          </span>
+        </div>
+      )}
+
       {/* A failing sync is silent money loss, so it gets a banner, not a log line. */}
-      {lastError && (
+      {configured && lastError && (
         <div className="bg-red-50 border-b-2 border-red-200 px-6 py-2 flex items-center gap-3 text-sm text-red-800 shrink-0">
           <TriangleAlert className="w-4 h-4 shrink-0" />
           <span className="flex-1 truncate">
