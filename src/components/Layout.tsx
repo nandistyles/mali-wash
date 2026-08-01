@@ -4,7 +4,7 @@ import { useAuth } from '../lib/auth';
 import { Car, Users, LayoutDashboard, Settings as SettingsIcon, Clock, LogOut, Calendar, TriangleAlert, RefreshCw, TrendingUp } from 'lucide-react';
 
 export default function Layout() {
-  const { isOnline, syncing, lastSync, pendingCount, lastError, triggerSync } = useSync();
+  const { isOnline, syncing, lastSync, pendingCount, lastError, configured, triggerSync } = useSync();
   const { staff, isAdmin, signOut, state } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -32,7 +32,9 @@ export default function Layout() {
    * rejected. It now distinguishes connected, queued, and failing, because on
    * this network those are three different situations and only one is fine.
    */
-  const status = !isOnline
+  const status = !configured
+    ? { dot: 'bg-slate-400', label: pendingCount > 0 ? `Local only · ${pendingCount}` : 'Local only' }
+    : !isOnline
     ? { dot: 'bg-amber-400', label: pendingCount > 0 ? `Offline · ${pendingCount} queued` : 'Offline' }
     : lastError
       ? { dot: 'bg-red-400', label: 'Sync failing' }
@@ -84,8 +86,21 @@ export default function Layout() {
         </div>
       </header>
 
+      {/* No Mali project configured: sync is deliberately switched off so records
+          cannot land in the AI Studio project the fallback config points at. */}
+      {!configured && (
+        <div className="bg-slate-100 border-b-2 border-slate-300 px-6 py-2 flex items-center gap-3 text-sm text-slate-700 shrink-0">
+          <TriangleAlert className="w-4 h-4 shrink-0" />
+          <span className="flex-1">
+            <b>Local only — no Mali Firebase project configured.</b> Everything works and nothing is lost,
+            but this device is not backed up and no other device can see it. Set <code className="bg-slate-200 px-1 rounded">VITE_FIREBASE_*</code> in <code className="bg-slate-200 px-1 rounded">.env.local</code> to turn sync on.
+            {pendingCount > 0 && <> {pendingCount} record{pendingCount === 1 ? '' : 's'} waiting.</>}
+          </span>
+        </div>
+      )}
+
       {/* A failing sync is silent money loss, so it gets a banner, not a log line. */}
-      {lastError && (
+      {configured && lastError && (
         <div className="bg-red-50 border-b-2 border-red-200 px-6 py-2 flex items-center gap-3 text-sm text-red-800 shrink-0">
           <TriangleAlert className="w-4 h-4 shrink-0" />
           <span className="flex-1 truncate">

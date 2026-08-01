@@ -1,6 +1,5 @@
 {
   "firestore": {
-    "database": "ai-studio-maliwash-188ecc8a-cede-4af8-b85c-4b3d1d9a55d1",
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"
   },

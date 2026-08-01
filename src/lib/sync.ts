@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from './db';
-import { db as firestore } from './firebase';
+import { db as firestore, isFirebaseConfigured } from './firebase';
 import { collection, doc, writeBatch, getDocs, query, where } from 'firebase/firestore';
 
 /**
@@ -74,6 +74,8 @@ export interface SyncState {
   lastSync: Date | null;
   pendingCount: number;
   lastError: string | null;
+  /** False when no Mali Firebase project is configured; sync is then a no-op. */
+  configured: boolean;
 }
 
 let state: SyncState = {
@@ -81,7 +83,8 @@ let state: SyncState = {
   syncing: false,
   lastSync: null,
   pendingCount: 0,
-  lastError: null
+  lastError: null,
+  configured: isFirebaseConfigured
 };
 
 const subscribers = new Set<(s: SyncState) => void>();
@@ -167,6 +170,21 @@ async function pullTable(name: TableName, field: string | null, since: number): 
 
 export async function performSync(): Promise<void> {
   if (inFlight) return;
+
+  /*
+   * Refuse to touch Firestore until a Mali-owned project is named. The fallback
+   * config in firebase.ts points at another application's project, and pushing
+   * here would write Mali Wash customer records into it. Everything stays queued
+   * in Dexie and syncs once .env.local is filled in — nothing is lost.
+   */
+  if (!isFirebaseConfigured) {
+    setState({
+      pendingCount: await countPending(),
+      lastError: null
+    });
+    return;
+  }
+
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     setState({ pendingCount: await countPending() });
     return;
