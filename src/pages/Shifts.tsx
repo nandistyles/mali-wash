@@ -77,23 +77,23 @@ export default function Shifts() {
   };
 
   return (
-    <div className="h-full w-full p-6 overflow-auto bg-slate-50 max-w-4xl mx-auto space-y-6">
+    <div className="h-full w-full p-6 overflow-auto bg-ink-50 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Till & Shift Management</h1>
-        <p className="text-slate-500">Open and close the daily till</p>
+        <h1 className="text-2xl font-bold text-ink-900">Till & Shift Management</h1>
+        <p className="text-ink-500">Open and close the daily till</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Active Shift Card */}
-        <Card className={`border-2 ${activeShift ? 'border-teal-500' : 'border-slate-200'}`}>
-          <CardHeader className={activeShift ? 'bg-teal-50' : ''}>
+        <Card className={`border-2 ${activeShift ? 'border-brand-500' : 'border-ink-200'}`}>
+          <CardHeader className={activeShift ? 'bg-brand-50' : ''}>
             <CardTitle>{activeShift ? 'Active Shift' : 'No Active Shift'}</CardTitle>
           </CardHeader>
           <CardContent className="p-6">
             {!activeShift ? (
               <form onSubmit={handleOpenShift} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Opening Cash Float (USD)</label>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Opening Cash Float (USD)</label>
                   <Input 
                     type="number" 
                     step="0.01" 
@@ -107,19 +107,19 @@ export default function Shifts() {
               </form>
             ) : (
               <form onSubmit={handleCloseShift} className="space-y-6">
-                <div className="grid grid-cols-2 gap-4 text-sm bg-slate-50 p-4 rounded-lg">
+                <div className="grid grid-cols-2 gap-4 text-sm bg-ink-50 p-4 rounded-lg">
                   <div>
-                    <span className="text-slate-500 block">Opened At</span>
+                    <span className="text-ink-500 block">Opened At</span>
                     <span className="font-semibold">{new Date(activeShift.openedAt).toLocaleTimeString()}</span>
                   </div>
                   <div>
-                    <span className="text-slate-500 block">Opening Float</span>
+                    <span className="text-ink-500 block">Opening Float</span>
                     <span className="font-semibold">{formatCurrency(activeShift.openingFloat)}</span>
                   </div>
                 </div>
 
                 <div className="space-y-3">
-                  <h3 className="font-medium text-slate-700">Expected Totals</h3>
+                  <h3 className="font-medium text-ink-700">Expected Totals</h3>
                   {/* Dynamic calculation for UI */}
                   {(() => {
                     let c = activeShift.openingFloat;
@@ -151,8 +151,8 @@ export default function Shifts() {
                   })()}
                 </div>
 
-                <div className="pt-4 border-t border-slate-200">
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Enter Counted Cash (USD)</label>
+                <div className="pt-4 border-t border-ink-200">
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Enter Counted Cash (USD)</label>
                   <Input 
                     type="number" 
                     step="0.01" 
@@ -181,23 +181,23 @@ export default function Shifts() {
             <div className="space-y-4">
               {shifts?.filter(s => s.status === 'closed').slice(0, 5).map(shift => (
                 <div key={shift.id} className="p-4 border rounded-lg bg-white shadow-sm">
-                  <div className="flex justify-between items-center mb-2 text-sm text-slate-500">
+                  <div className="flex justify-between items-center mb-2 text-sm text-ink-500">
                     <span>{new Date(shift.openedAt).toLocaleDateString()}</span>
                     <span>{shift.variance === 0 ? '✅ Balanced' : shift.variance! > 0 ? '⬆️ Over' : '⬇️ Short'}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>
-                      <span className="text-slate-400 text-xs uppercase block">Expected Cash</span>
-                      <span className="font-semibold text-slate-900">{formatCurrency(shift.expectedCash)}</span>
+                      <span className="text-ink-400 text-xs uppercase block">Expected Cash</span>
+                      <span className="font-semibold text-ink-900">{formatCurrency(shift.expectedCash)}</span>
                     </div>
                     <div>
-                      <span className="text-slate-400 text-xs uppercase block">Counted Cash</span>
-                      <span className="font-semibold text-slate-900">{formatCurrency(shift.countedCash || 0)}</span>
+                      <span className="text-ink-400 text-xs uppercase block">Counted Cash</span>
+                      <span className="font-semibold text-ink-900">{formatCurrency(shift.countedCash || 0)}</span>
                     </div>
                     <div className="col-span-2 mt-1">
-                      <span className="text-slate-400 text-xs uppercase block">Variance</span>
+                      <span className="text-ink-400 text-xs uppercase block">Variance</span>
                       <span className={`font-bold ${
-                        (shift.variance || 0) === 0 ? 'text-teal-600' : 'text-red-500'
+                        (shift.variance || 0) === 0 ? 'text-brand-600' : 'text-red-500'
                       }`}>
                         {formatCurrency(shift.variance || 0)}
                       </span>
@@ -206,7 +206,7 @@ export default function Shifts() {
                 </div>
               ))}
               {(!shifts || shifts.filter(s => s.status === 'closed').length === 0) && (
-                <div className="text-center text-slate-500 py-4">No closed shifts yet.</div>
+                <div className="text-center text-ink-500 py-4">No closed shifts yet.</div>
               )}
             </div>
           </CardContent>

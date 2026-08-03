@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth, DEV_LOGIN_ENABLED, BOOTSTRAP_ADMIN_UID } from '../lib/auth';
+import { useAuth, DEV_LOGIN_ENABLED } from '../lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Car, LogIn, TriangleAlert, Wrench } from 'lucide-react';
@@ -11,8 +11,7 @@ import { Car, LogIn, TriangleAlert, Wrench } from 'lucide-react';
  * till has to open on a load-shedding morning.
  */
 export default function Login() {
-  const { state, signInWithEmail, signInAsDev, signOut, provisionBootstrapAdmin } = useAuth();
-  const [adminName, setAdminName] = useState('');
+  const { state, signInWithEmail, signInAsDev, signOut } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -63,63 +62,26 @@ export default function Login() {
   if (state.status === 'no_staff_record' || state.status === 'inactive') {
     const isInactive = state.status === 'inactive';
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
-        <Card className="w-full max-w-md shadow-xl border-2 border-amber-300">
+      <div className="min-h-screen bg-ink-50 flex flex-col items-center justify-center p-4">
+        <Card className="w-full max-w-md shadow-xl border-2 border-accent-300">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-amber-700">
+            <CardTitle className="flex items-center gap-2 text-accent-700">
               <TriangleAlert className="w-5 h-5" />
               {isInactive ? 'Account deactivated' : 'No staff record'}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-slate-600">
+            <p className="text-sm text-ink-600">
               {isInactive
                 ? 'This account has been deactivated. Ask an admin to reactivate it.'
                 : 'You signed in, but there is no staff record for this account, so you have no access to any data.'}
             </p>
             {!isInactive && state.status === 'no_staff_record' && (
-              state.user.uid === BOOTSTRAP_ADMIN_UID ? (
-                // The founding admin can provision itself; the rules allow this
-                // uid and no other. Saves creating the document by hand.
-                <div className="space-y-3 border-t pt-4">
-                  <p className="text-sm text-slate-700">
-                    This is the founding admin account. Set up your staff record now:
-                  </p>
-                  <input
-                    value={adminName}
-                    onChange={e => setAdminName(e.target.value)}
-                    placeholder="Your name"
-                    className="w-full h-11 px-3 border-2 border-slate-200 rounded-md focus:border-teal-500 focus:outline-none"
-                  />
-                  <Button
-                    className="w-full h-11"
-                    disabled={busy}
-                    onClick={async () => {
-                      setBusy(true);
-                      setError('');
-                      try {
-                        await provisionBootstrapAdmin(adminName);
-                      } catch (err: any) {
-                        setError(
-                          err?.code === 'permission-denied'
-                            ? 'Rules refused this. Deploy the current firestore.rules, then retry.'
-                            : err?.message || 'Could not create the staff record.'
-                        );
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
-                  >
-                    {busy ? 'Setting up…' : 'Set up my admin account'}
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500 font-mono bg-slate-100 p-3 rounded border break-all">
-                  An admin must create a document in the <b>staff</b> collection with the id:
-                  <br />
-                  <b className="text-slate-800">{state.user.uid}</b>
-                </p>
-              )
+              <p className="text-xs text-ink-500 font-mono bg-ink-100 p-3 rounded border break-all">
+                An administrator must create a staff record for this account id:
+                <br />
+                <b className="text-ink-800">{state.user.uid}</b>
+              </p>
             )}
             <Button onClick={() => signOut()} variant="outline" className="w-full">
               Sign out
@@ -131,13 +93,13 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-ink-50 flex flex-col items-center justify-center p-4">
       <div className="mb-8 text-center flex flex-col items-center">
-        <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center mb-4 text-white shadow-lg">
+        <div className="w-16 h-16 bg-brand-600 rounded-2xl flex items-center justify-center mb-4 text-white shadow-lg">
           <Car className="w-8 h-8" />
         </div>
-        <h1 className="text-3xl font-bold text-teal-900 mb-2">Mali Wash</h1>
-        <p className="text-slate-600">Staff Portal</p>
+        <h1 className="text-3xl font-bold text-brand-900 mb-2">Mali Wash</h1>
+        <p className="text-ink-600">Staff Portal</p>
       </div>
 
       <Card className="w-full max-w-md shadow-xl">
@@ -153,7 +115,7 @@ export default function Login() {
             )}
 
             <div>
-              <label htmlFor="email" className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+              <label htmlFor="email" className="block text-xs font-bold uppercase tracking-wider text-ink-500 mb-1">
                 Email
               </label>
               <input
@@ -163,13 +125,13 @@ export default function Login() {
                 required
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                className="w-full h-12 px-3 border-2 border-slate-200 rounded-md focus:border-teal-500 focus:outline-none text-base"
+                className="w-full h-12 px-3 border-2 border-ink-200 rounded-md focus:border-brand-500 focus:outline-none text-base"
                 placeholder="you@maliwash.co.zw"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
+              <label htmlFor="password" className="block text-xs font-bold uppercase tracking-wider text-ink-500 mb-1">
                 Password
               </label>
               <input
@@ -179,7 +141,7 @@ export default function Login() {
                 required
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                className="w-full h-12 px-3 border-2 border-slate-200 rounded-md focus:border-teal-500 focus:outline-none text-base"
+                className="w-full h-12 px-3 border-2 border-ink-200 rounded-md focus:border-brand-500 focus:outline-none text-base"
                 placeholder="••••••••"
               />
             </div>
@@ -190,18 +152,18 @@ export default function Login() {
             </Button>
 
             {DEV_LOGIN_ENABLED && (
-              <div className="pt-4 mt-4 border-t border-dashed border-slate-300">
+              <div className="pt-4 mt-4 border-t border-dashed border-ink-300">
                 <Button
                   type="button"
                   onClick={handleDevLogin}
                   variant="outline"
                   disabled={busy}
-                  className="w-full h-12 flex items-center gap-2 border-amber-400 text-amber-700 hover:bg-amber-50"
+                  className="w-full h-12 flex items-center gap-2 border-accent-400 text-accent-700 hover:bg-accent-50"
                 >
                   <Wrench className="w-5 h-5" />
                   Continue as Dev Admin
                 </Button>
-                <p className="text-[11px] text-slate-500 text-center mt-2">
+                <p className="text-[11px] text-ink-500 text-center mt-2">
                   Local development only — this button does not exist in a production build.
                 </p>
               </div>

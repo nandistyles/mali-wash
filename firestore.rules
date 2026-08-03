@@ -176,9 +176,16 @@ service cloud.firestore {
       // You may only book money against a business you are assigned to.
       allow create: if canOperate(incoming().business) && isValidId(transactionId) && isValidTransaction(incoming());
       // Voiding only — a completed sale is never silently rewritten.
-      allow update: if canOperate(existing().business) && isValidId(transactionId) && isValidTransaction(incoming()) && (
-        incoming().diff(existing()).affectedKeys().hasOnly(['status'])
-      );
+      allow update: if canOperate(existing().business)
+        && isValidId(transactionId)
+        && isValidTransaction(incoming())
+        && existing().status == 'completed'
+        && incoming().status == 'voided'
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'businessMeta'])
+        && incoming().businessMeta.diff(existing().businessMeta).affectedKeys().hasOnly(['voidReason', 'voidedAt'])
+        && incoming().businessMeta.voidReason is string
+        && incoming().businessMeta.voidReason.size() <= 255
+        && incoming().businessMeta.voidedAt is number;
       allow delete: if false; // ledger integrity: void, never delete
     }
 
@@ -201,24 +208,9 @@ service cloud.firestore {
       // their own role before any other rule can be evaluated).
       allow get: if isSignedIn() && request.auth.uid == staffId;
       allow list: if isStaff();
-      // No general self-create — that was the privilege-escalation hole: any
-      // signed-in account could mint itself role: 'admin'.
-      //
-      // Bootstrapping is a genuine chicken-and-egg problem: an admin must exist
-      // before an admin can create one. Rather than leave a self-create path
-      // open, exactly one known uid may create exactly its own document. Anyone
-      // else is refused, including that uid creating a document for someone
-      // else. This is a ladder, not a door — delete the clause once the record
-      // exists and redeploy.
-      allow create: if isValidId(staffId) && isValidStaff(incoming()) && (
-        isAdmin() || (
-          isSignedIn()
-          && request.auth.uid == staffId
-          && staffId == 'BYlc3JPiRhaBtlDjx87qhjealvG2'
-          && incoming().role == 'admin'
-          && incoming().active == true
-        )
-      );
+      // Staff creation is admin-only. The one-time founding-admin exception
+      // was removed after the production administrator record was created.
+      allow create: if isAdmin() && isValidId(staffId) && isValidStaff(incoming());
       allow update: if isAdmin() && isValidId(staffId) && isValidStaff(incoming()) && (
         incoming().diff(existing()).affectedKeys().hasOnly(['name', 'role', 'businesses', 'active', 'pin'])
       );
@@ -264,7 +256,10 @@ service cloud.firestore {
     }
 
     match /settings/{settingsId} {
-      allow get, list: if isStaff();
+      // The public form may fetch the one global price list by its exact id.
+      // Collection listing and all writes remain restricted.
+      allow get: if isStaff() || settingsId == 'global';
+      allow list: if isStaff();
       allow create, update: if isAdmin() && isValidId(settingsId) && isValidSettings(incoming());
       allow delete: if false;
     }

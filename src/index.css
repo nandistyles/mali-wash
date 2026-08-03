@@ -1,1 +1,239 @@
 @import "tailwindcss";
+
+/* ===========================================================================
+   Mali design tokens
+   ---------------------------------------------------------------------------
+   The UI primitives were written against shadcn's semantic token names
+   (bg-card, border-input, ring-ring, bg-background, hover:bg-accent) but none
+   of them were ever defined — the stylesheet was a bare Tailwind import. Those
+   classes compiled to nothing, which is why Cards had no background, outline
+   Buttons had no border, and focus rings never appeared.
+
+   Defining them here fixes those silently-dead styles and gives every Mali
+   business one palette to inherit.
+
+   Designed for a tablet on a forecourt in Ruwa: high contrast for sunlight,
+   large touch targets, and money that can be read at arm's length.
+   =========================================================================== */
+
+@theme {
+  /* --- Brand: Mali deep teal ------------------------------------------- */
+  --color-brand-50:  #f0faf9;
+  --color-brand-100: #d7f2ef;
+  --color-brand-200: #b0e5df;
+  --color-brand-300: #7fd1c9;
+  --color-brand-400: #4bb5ad;
+  --color-brand-500: #269b93;
+  --color-brand-600: #0f7d77;
+  --color-brand-700: #0a6360;
+  --color-brand-800: #084e4c;
+  --color-brand-900: #063e3d;
+  --color-brand-950: #032726;
+
+  /* --- Accent: warm gold. Reads instantly against teal and stays legible
+         in direct sun, where a second cool colour would not. -------------- */
+  --color-accent-50:  #fff9ec;
+  --color-accent-100: #fff1cd;
+  --color-accent-200: #ffe09f;
+  --color-accent-300: #ffc857;
+  --color-accent-400: #fbb130;
+  --color-accent-500: #f59410;
+  --color-accent-600: #d97008;
+  --color-accent-700: #b44f0a;
+  --color-accent-800: #923e0f;
+  --color-accent-900: #783410;
+
+  /* --- Ink: neutrals with a trace of teal so greys sit with the brand
+         instead of looking like a different stylesheet. ------------------- */
+  --color-ink-50:  #f7f9f9;
+  --color-ink-100: #eef2f2;
+  --color-ink-200: #dde4e4;
+  --color-ink-300: #c2cdcd;
+  --color-ink-400: #93a3a3;
+  --color-ink-500: #6b7b7b;
+  --color-ink-600: #536161;
+  --color-ink-700: #434e4e;
+  --color-ink-800: #2b3434;
+  --color-ink-900: #1a2121;
+  --color-ink-950: #0d1212;
+
+  /* --- Semantic tokens the primitives already reference ----------------- */
+  --color-background: #f6f8f8;
+  --color-foreground: #1a2121;
+  --color-card: #ffffff;
+  --color-card-foreground: #1a2121;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #1a2121;
+  --color-primary: #0a6360;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #eef2f2;
+  --color-secondary-foreground: #1a2121;
+  --color-muted: #eef2f2;
+  --color-muted-foreground: #6b7b7b;
+  --color-accent: #f0faf9;
+  --color-accent-foreground: #063e3d;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-success: #0f8a5f;
+  --color-warning: #b45309;
+  --color-border: #dde4e4;
+  --color-input: #c2cdcd;
+  --color-ring: #269b93;
+
+  /* --- Type ------------------------------------------------------------- */
+  --font-sans: "Segoe UI Variable Display", "Segoe UI", ui-sans-serif, system-ui,
+    -apple-system, BlinkMacSystemFont, "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "SF Mono", Menlo, Consolas, monospace;
+
+  /* --- Radius: 12px reads friendly without looking like a toy ----------- */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+
+  /* --- Shadows: layered and low-opacity. A single hard shadow is what
+         makes an interface look like a wireframe. ------------------------- */
+  --shadow-xs: 0 1px 2px 0 rgb(13 18 18 / 0.04);
+  --shadow-sm: 0 1px 2px 0 rgb(13 18 18 / 0.04), 0 1px 3px 0 rgb(13 18 18 / 0.06);
+  --shadow-md: 0 2px 4px -1px rgb(13 18 18 / 0.05), 0 4px 12px -2px rgb(13 18 18 / 0.08);
+  --shadow-lg: 0 4px 8px -2px rgb(13 18 18 / 0.05), 0 12px 24px -4px rgb(13 18 18 / 0.10);
+  --shadow-xl: 0 8px 16px -4px rgb(13 18 18 / 0.06), 0 24px 48px -8px rgb(13 18 18 / 0.14);
+  --shadow-brand: 0 4px 14px -2px rgb(10 99 96 / 0.30);
+
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* =========================================================================== */
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    /* Stops iOS zooming the whole POS when an attendant taps an input. */
+    touch-action: manipulation;
+  }
+
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+
+  /* Money and counts must not jitter as digits change — a total that shifts
+     width while the attendant reads it is genuinely harder to trust. */
+  .tabular,
+  [data-money],
+  input[type="number"] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.018em;
+    text-wrap: balance;
+  }
+
+  /* One consistent focus treatment, keyboard-only. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  ::selection {
+    background-color: var(--color-brand-200);
+    color: var(--color-brand-950);
+  }
+
+  /* Scrollbars that don't look like Windows 98 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-ink-300) transparent;
+  }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background-color: var(--color-ink-300);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover { background-color: var(--color-ink-400); }
+}
+
+@layer components {
+  /* Micro-label used throughout: section headers, field labels, stat captions. */
+  .label-caps {
+    font-size: 0.6875rem;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--color-muted-foreground);
+  }
+
+  /* Elevated panel. Replaces the ad-hoc border+shadow repeated on every screen. */
+  .surface {
+    background-color: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Press feedback for touch. Tablets have no hover, so the press state is the
+     only confirmation an attendant gets that a tap registered. */
+  .pressable {
+    transition: transform 120ms var(--ease-out-soft),
+                box-shadow 160ms var(--ease-out-soft),
+                background-color 160ms var(--ease-out-soft),
+                border-color 160ms var(--ease-out-soft);
+  }
+  .pressable:active:not(:disabled) {
+    transform: scale(0.975);
+  }
+
+  /* Subtle depth for the app shell header. */
+  .brand-gradient {
+    background-image: linear-gradient(
+      160deg,
+      var(--color-brand-800) 0%,
+      var(--color-brand-900) 55%,
+      var(--color-brand-950) 100%
+    );
+  }
+}
+
+@layer utilities {
+  .animate-in-up {
+    animation: mali-in-up 260ms var(--ease-out-soft) both;
+  }
+  @keyframes mali-in-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: none; }
+  }
+
+  .animate-in-fade {
+    animation: mali-in-fade 200ms var(--ease-out-soft) both;
+  }
+  @keyframes mali-in-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

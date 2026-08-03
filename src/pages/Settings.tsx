@@ -55,10 +55,10 @@ export default function Settings() {
   };
 
   return (
-    <div className="h-full w-full p-6 overflow-auto bg-slate-50 max-w-5xl mx-auto space-y-6">
+    <div className="h-full w-full p-6 overflow-auto bg-ink-50 max-w-5xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Admin Settings</h1>
-        <p className="text-slate-500">Configure app rules and pricing</p>
+        <h1 className="text-2xl font-bold text-ink-900">Admin Settings</h1>
+        <p className="text-ink-500">Configure app rules and pricing</p>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 items-start">
@@ -68,7 +68,7 @@ export default function Settings() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Points Earned per Wash</label>
+              <label className="block text-sm font-medium text-ink-700 mb-1">Points Earned per Wash</label>
               <Input 
                 type="number" 
                 value={pointsPerWash}
@@ -76,14 +76,14 @@ export default function Settings() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Referral Reward Points</label>
+              <label className="block text-sm font-medium text-ink-700 mb-1">Referral Reward Points</label>
               <Input 
                 type="number" 
                 value={referralPoints}
                 onChange={e => setReferralPoints(e.target.value)}
               />
             </div>
-            <Button onClick={handleSavePoints} className="w-full bg-[#004D4D] hover:bg-teal-900">Save Rules</Button>
+            <Button onClick={handleSavePoints} className="w-full bg-brand-900 hover:bg-brand-900">Save Rules</Button>
           </CardContent>
         </Card>
 
@@ -97,10 +97,10 @@ export default function Settings() {
           <CardContent className="space-y-4">
             <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
               {services.map((s, idx) => (
-                <div key={s.id} className="flex flex-col gap-2 p-3 border border-slate-200 rounded-lg bg-white relative">
+                <div key={s.id} className="flex flex-col gap-2 p-3 border border-ink-200 rounded-lg bg-white relative">
                   <div className="flex gap-2">
                     <div className="flex-1">
-                      <label className="text-xs text-slate-500 font-medium">Service Name</label>
+                      <label className="text-xs text-ink-500 font-medium">Service Name</label>
                       <Input 
                         value={s.name} 
                         onChange={(e) => updateService(idx, 'name', e.target.value)}
@@ -108,13 +108,13 @@ export default function Settings() {
                       />
                     </div>
                     <div className="w-24">
-                      <label className="text-xs text-slate-500 font-medium">Price (USD)</label>
+                      <label className="text-xs text-ink-500 font-medium">Price (USD)</label>
                       <Input 
                         type="number" 
                         step="0.01"
                         value={s.price} 
                         onChange={(e) => updateService(idx, 'price', parseFloat(e.target.value) || 0)}
-                        className="h-8 text-sm font-bold text-teal-700"
+                        className="h-8 text-sm font-bold text-brand-700"
                       />
                     </div>
                   </div>
@@ -123,7 +123,7 @@ export default function Settings() {
                       <select 
                         value={s.type}
                         onChange={(e) => updateService(idx, 'type', e.target.value)}
-                        className="h-8 text-xs bg-slate-50 border border-slate-200 rounded-md px-2"
+                        className="h-8 text-xs bg-ink-50 border border-ink-200 rounded-md px-2"
                       >
                         <option value="wash">Wash</option>
                         <option value="membership">Membership</option>
@@ -141,7 +141,7 @@ export default function Settings() {
               ))}
             </div>
             
-            <Button onClick={handleSaveServices} className="w-full bg-[#004D4D] hover:bg-teal-900 mt-4">Save Services</Button>
+            <Button onClick={handleSaveServices} className="w-full bg-brand-900 hover:bg-brand-900 mt-4">Save Services</Button>
           </CardContent>
         </Card>
       </div>

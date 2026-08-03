@@ -1,25 +1,47 @@
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 
+/**
+ * Sizes are deliberately larger than a desktop default. This is operated on a
+ * tablet, often one-handed, sometimes with wet hands — 44px is the accessibility
+ * floor and the wrong target for a forecourt, so the default is 48px and the
+ * primary POS actions use `lg`.
+ */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  [
+    "pressable inline-flex items-center justify-center gap-2 whitespace-nowrap",
+    "font-semibold rounded-lg select-none",
+    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+    "disabled:pointer-events-none disabled:opacity-45",
+  ].join(" "),
   {
     variants: {
       variant: {
-        default: "bg-teal-700 text-white hover:bg-teal-800",
-        destructive: "bg-red-500 text-white hover:bg-red-600",
-        outline: "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
-        secondary: "bg-teal-100 text-teal-900 hover:bg-teal-200",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
-        link: "text-primary underline-offset-4 hover:underline",
+        default:
+          "bg-brand-700 text-white shadow-sm hover:bg-brand-800 active:bg-brand-900",
+        primary:
+          "bg-brand-800 text-white shadow-brand hover:bg-brand-900 active:bg-brand-950",
+        accent:
+          "bg-accent-300 text-brand-950 shadow-sm hover:bg-accent-400 active:bg-accent-500",
+        destructive:
+          "bg-destructive text-white shadow-sm hover:bg-red-700 active:bg-red-800",
+        outline:
+          "border-2 border-ink-200 bg-card text-ink-800 hover:border-brand-300 hover:bg-brand-50 active:bg-brand-100",
+        secondary:
+          "bg-brand-50 text-brand-900 border border-brand-100 hover:bg-brand-100 active:bg-brand-200",
+        ghost:
+          "text-ink-600 hover:bg-ink-100 hover:text-ink-900 active:bg-ink-200",
+        link:
+          "text-brand-700 underline-offset-4 hover:underline",
       },
       size: {
-        default: "h-12 px-6 py-3", // Larger touch targets for tablet
-        sm: "h-9 rounded-md px-3",
-        lg: "h-14 rounded-md px-8 text-lg",
+        sm: "h-9 px-3 text-sm rounded-md",
+        default: "h-12 px-5 text-[0.9375rem]",
+        lg: "h-14 px-8 text-base",
+        xl: "h-16 px-8 text-lg rounded-xl",
         icon: "h-12 w-12",
+        "icon-sm": "h-9 w-9 rounded-md",
       },
     },
     defaultVariants: {
@@ -37,7 +59,6 @@ export interface ButtonProps
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, asChild = false, ...props }, ref) => {
-    // Basic fallback for Slot since we didn't install radix-ui/react-slot to save time
     const Comp = asChild ? "span" : "button"
     return (
       <Comp

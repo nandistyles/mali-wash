@@ -136,16 +136,16 @@ export default function Growth() {
   };
 
   return (
-    <div className="h-full w-full overflow-auto bg-slate-50 p-6">
+    <div className="h-full w-full overflow-auto bg-ink-50 p-6">
       <div className="max-w-5xl mx-auto space-y-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Growth</h1>
-            <p className="text-slate-500">Who to talk to today, and what to say.</p>
+            <h1 className="text-2xl font-bold text-ink-900">Growth</h1>
+            <p className="text-ink-500">Who to talk to today, and what to say.</p>
           </div>
           <button
             onClick={load}
-            className="flex items-center gap-2 px-3 py-2 bg-white border-2 border-slate-200 rounded-lg text-sm font-bold text-slate-600 hover:border-teal-400"
+            className="flex items-center gap-2 px-3 py-2 bg-white border-2 border-ink-200 rounded-lg text-sm font-bold text-ink-600 hover:border-brand-400"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
           </button>
@@ -160,12 +160,12 @@ export default function Growth() {
                 key={tab.id}
                 onClick={() => setSegment(tab.id)}
                 className={`p-3 rounded-xl border-2 text-left transition-all ${
-                  active ? 'bg-[#004D4D] border-[#004D4D] text-white' : 'bg-white border-slate-200 hover:border-teal-400'
+                  active ? 'bg-brand-900 border-brand-900 text-white' : 'bg-white border-ink-200 hover:border-brand-400'
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <tab.icon className="w-4 h-4" />
-                  <span className={`text-lg font-black ${active ? 'text-white' : 'text-teal-700'}`}>{count}</span>
+                  <span className={`text-lg font-black ${active ? 'text-white' : 'text-brand-700'}`}>{count}</span>
                 </div>
                 <div className="text-xs font-bold uppercase tracking-wider">{tab.label}</div>
               </button>
@@ -173,13 +173,13 @@ export default function Growth() {
           })}
         </div>
 
-        <p className="text-sm text-slate-500 -mt-2">{tabs.find(t => t.id === segment)?.hint}</p>
+        <p className="text-sm text-ink-500 -mt-2">{tabs.find(t => t.id === segment)?.hint}</p>
 
         {!insights ? (
-          <Card><CardContent className="p-12 text-center text-slate-500">Reading the ledger…</CardContent></Card>
+          <Card><CardContent className="p-12 text-center text-ink-500">Reading the ledger…</CardContent></Card>
         ) : rows.length === 0 ? (
           <Card>
-            <CardContent className="p-12 text-center text-slate-500">
+            <CardContent className="p-12 text-center text-ink-500">
               <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
               <p className="font-medium">Nobody in this list right now.</p>
               <p className="text-sm mt-1">
@@ -192,12 +192,12 @@ export default function Growth() {
         ) : (
           <>
             {remaining.length === 0 && (
-              <div className="p-4 bg-teal-50 border-2 border-teal-200 rounded-xl text-teal-900 font-bold text-center">
+              <div className="p-4 bg-brand-50 border-2 border-brand-200 rounded-xl text-brand-900 font-bold text-center">
                 All {rows.length} contacted today. Nice.
               </div>
             )}
             <Card>
-              <CardContent className="p-0 divide-y divide-slate-100">
+              <CardContent className="p-0 divide-y divide-ink-100">
                 {rows.map(i => {
                   const done = contacted[i.customer.id];
                   return (
@@ -205,17 +205,17 @@ export default function Growth() {
                       key={i.customer.id}
                       className={`p-4 flex items-center gap-4 ${done ? 'opacity-45' : ''}`}
                     >
-                      <div className="w-10 h-10 rounded-full bg-teal-600 text-white font-bold flex items-center justify-center shrink-0">
+                      <div className="w-10 h-10 rounded-full bg-brand-600 text-white font-bold flex items-center justify-center shrink-0">
                         {i.customer.name.charAt(0).toUpperCase()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-bold text-slate-900 truncate">{i.customer.name}</p>
-                        <p className="text-xs text-slate-500">{subtitle(i)}</p>
-                        <p className="text-xs text-slate-400">{formatPhone(i.customer.phone)}</p>
+                        <p className="font-bold text-ink-900 truncate">{i.customer.name}</p>
+                        <p className="text-xs text-ink-500">{subtitle(i)}</p>
+                        <p className="text-xs text-ink-400">{formatPhone(i.customer.phone)}</p>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {done ? (
-                          <span className="flex items-center gap-1 text-teal-600 text-sm font-bold px-3">
+                          <span className="flex items-center gap-1 text-brand-600 text-sm font-bold px-3">
                             <Check className="w-4 h-4" /> Sent
                           </span>
                         ) : (
