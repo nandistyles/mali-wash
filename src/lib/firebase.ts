@@ -1,4 +1,5 @@
 import { initializeApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from 'firebase/app-check';
 import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 /**
@@ -71,6 +72,25 @@ if (!usingEnv) {
 }
 
 const app = initializeApp(firebaseConfig as Record<string, string>);
+
+/**
+ * Public booking is the only unauthenticated write in the platform. App Check
+ * proves that the request came from the deployed Mali Wash web app rather than
+ * a script calling Firestore directly. Enforcement must also be enabled for
+ * Firestore in Firebase Console after the site key is configured.
+ */
+const appCheckSiteKey: string = env.VITE_FIREBASE_APPCHECK_SITE_KEY || '';
+export const isAppCheckConfigured = Boolean(usingEnv && appCheckSiteKey);
+export const appCheck: AppCheck | null = isAppCheckConfigured && typeof window !== 'undefined'
+  ? initializeAppCheck(app, {
+      provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey),
+      isTokenAutoRefreshEnabled: true
+    })
+  : null;
+
+if (usingEnv && !isAppCheckConfigured) {
+  console.warn('[Mali] Firebase App Check is not configured. Public booking is disabled.');
+}
 
 export const db = getFirestore(app, databaseId);
 export const auth = getAuth(app);

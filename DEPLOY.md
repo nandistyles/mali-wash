@@ -2,16 +2,11 @@
 
 ## Read this first
 
-The `firebase-applet-config.json` committed to this repo points at
-`gen-lang-client-0971315086` — an AI Studio project belonging to a **different
-application**. It is not the Mali Wash backend and must never hold Mali Wash
-customer data.
-
-Until you set `VITE_FIREBASE_*` in `.env.local`, the app runs **local only**:
-everything works, Dexie holds the data, and sync is switched off on purpose so
-records cannot land in that other project. The header says "Local only" and a
-banner explains it. Nothing is lost — queued records sync the moment a real
-project is configured.
+There is deliberately no bundled fallback Firebase project. Until you set
+`VITE_FIREBASE_*` in `.env.local`, staff operations run **local only**: Dexie
+holds the data and sync is disabled. Public booking is also disabled because it
+cannot safely promise delivery without the Mali-owned cloud project and App
+Check protection.
 
 So the first job is not deploying. It is creating a Mali-owned Firebase project.
 
@@ -54,6 +49,7 @@ VITE_FIREBASE_PROJECT_ID=mali-wash
 VITE_FIREBASE_STORAGE_BUCKET=mali-wash.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
+VITE_FIREBASE_APPCHECK_SITE_KEY=...
 
 # Only if you created a NAMED database instead of the default one:
 # VITE_FIREBASE_DATABASE_ID=your-database-name
@@ -112,6 +108,18 @@ Sign in to the app with the email/password from 3a and confirm the POS loads.
 "No staff record" means the document id does not match the uid — the screen
 prints the uid you need.
 
+### Configure App Check before sharing `/book`
+
+1. Firebase Console → **App Check** → select the Mali Wash web app.
+2. Register a **reCAPTCHA Enterprise** provider and add the deployed domains.
+3. Put its site key in `VITE_FIREBASE_APPCHECK_SITE_KEY` and deploy the app.
+4. Confirm a real booking reaches Firestore and appears on the staff Bookings screen.
+5. In App Check, enable **enforcement for Firestore**.
+
+The booking form deliberately disables submission when this key is absent. Do
+not enable Firestore enforcement before the protected build is deployed, or
+valid staff clients running the previous build will be rejected too.
+
 ---
 
 ## 5. Deploy the app
@@ -127,12 +135,11 @@ The public booking page is then live at `https://<your-domain>/book`.
 
 ## Before real customer data goes in
 
-- **Turn on App Check.** `/book` is the one unauthenticated write in the
-  database. Validation stops malformed writes, not a script hammering it.
+- Confirm **App Check enforcement** is enabled for Firestore. `/book` is the
+  one unauthenticated write in the database.
 - **Set a budget alert** on the project.
-- **Rotate nothing, but do delete** `firebase-applet-config.json` once
-  `.env.local` is working — it only exists as a boot fallback and it names
-  another team's project.
+- Confirm the deployed environment contains the same Firebase and App Check
+  variables used for the verified local build.
 
 ## Rolling back
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth, DEV_LOGIN_ENABLED, BOOTSTRAP_ADMIN_UID } from '../lib/auth';
+import { useAuth, DEV_LOGIN_ENABLED } from '../lib/auth';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Car, LogIn, TriangleAlert, Wrench } from 'lucide-react';
@@ -11,8 +11,7 @@ import { Car, LogIn, TriangleAlert, Wrench } from 'lucide-react';
  * till has to open on a load-shedding morning.
  */
 export default function Login() {
-  const { state, signInWithEmail, signInAsDev, signOut, provisionBootstrapAdmin } = useAuth();
-  const [adminName, setAdminName] = useState('');
+  const { state, signInWithEmail, signInAsDev, signOut } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -78,48 +77,11 @@ export default function Login() {
                 : 'You signed in, but there is no staff record for this account, so you have no access to any data.'}
             </p>
             {!isInactive && state.status === 'no_staff_record' && (
-              state.user.uid === BOOTSTRAP_ADMIN_UID ? (
-                // The founding admin can provision itself; the rules allow this
-                // uid and no other. Saves creating the document by hand.
-                <div className="space-y-3 border-t pt-4">
-                  <p className="text-sm text-ink-700">
-                    This is the founding admin account. Set up your staff record now:
-                  </p>
-                  <input
-                    value={adminName}
-                    onChange={e => setAdminName(e.target.value)}
-                    placeholder="Your name"
-                    className="w-full h-11 px-3 border-2 border-ink-200 rounded-md focus:border-brand-500 focus:outline-none"
-                  />
-                  <Button
-                    className="w-full h-11"
-                    disabled={busy}
-                    onClick={async () => {
-                      setBusy(true);
-                      setError('');
-                      try {
-                        await provisionBootstrapAdmin(adminName);
-                      } catch (err: any) {
-                        setError(
-                          err?.code === 'permission-denied'
-                            ? 'Rules refused this. Deploy the current firestore.rules, then retry.'
-                            : err?.message || 'Could not create the staff record.'
-                        );
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
-                  >
-                    {busy ? 'Setting up…' : 'Set up my admin account'}
-                  </Button>
-                </div>
-              ) : (
-                <p className="text-xs text-ink-500 font-mono bg-ink-100 p-3 rounded border break-all">
-                  An admin must create a document in the <b>staff</b> collection with the id:
-                  <br />
-                  <b className="text-ink-800">{state.user.uid}</b>
-                </p>
-              )
+              <p className="text-xs text-ink-500 font-mono bg-ink-100 p-3 rounded border break-all">
+                An administrator must create a staff record for this account id:
+                <br />
+                <b className="text-ink-800">{state.user.uid}</b>
+              </p>
             )}
             <Button onClick={() => signOut()} variant="outline" className="w-full">
               Sign out

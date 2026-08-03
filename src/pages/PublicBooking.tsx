@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
-import { useLiveQuery } from 'dexie-react-hooks';
-import { db, getSettings } from '../lib/db';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { DEFAULT_SETTINGS } from '../lib/db';
+import { db as firestore, isAppCheckConfigured, isFirebaseConfigured } from '../lib/firebase';
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { isValidPhone, normalisePhone } from '../lib/phone';
-import { notifyLocalWrite } from '../lib/sync';
 import { formatCurrency } from '../lib/utils';
+import type { Settings } from '../types';
+
+const BOOKING_COOLDOWN_KEY = 'mali_public_booking_last_submit';
+const BOOKING_COOLDOWN_MS = 60_000;
 
 export default function PublicBooking() {
-  const settings = useLiveQuery(() => getSettings());
+  const [settings, setSettings] = useState<Settings | null>(null);
+  const [loadingSettings, setLoadingSettings] = useState(true);
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -20,9 +25,41 @@ export default function PublicBooking() {
     requestedTime: ''
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
   const washServices = settings?.services.filter(service => service.type === 'wash') ?? [];
+
+  // Public visitors do not have a staff session, so read the single public
+  // price-list document directly from Firestore. Never show stale local
+  // defaults as if they were the business's current prices.
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!isFirebaseConfigured || !isAppCheckConfigured) {
+      setError('Online booking is temporarily unavailable. Please contact Mali Wash directly.');
+      setLoadingSettings(false);
+      return;
+    }
+
+    void getDoc(doc(firestore, 'settings', 'global'))
+      .then(snapshot => {
+        if (cancelled) return;
+        if (!snapshot.exists()) {
+          setError('Online booking has not been configured yet. Please contact Mali Wash directly.');
+          return;
+        }
+        setSettings({ ...DEFAULT_SETTINGS, ...(snapshot.data() as Partial<Settings>) });
+      })
+      .catch(() => {
+        if (!cancelled) setError('Could not load current services. Check your connection and try again.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingSettings(false);
+      });
+
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     if (washServices.length > 0 && !washServices.some(service => service.id === formData.serviceType)) {
@@ -33,6 +70,17 @@ export default function PublicBooking() {
   const handleSubmit = async (e: import("react").FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!isFirebaseConfigured || !isAppCheckConfigured || !settings) {
+      setError('Online booking is unavailable right now. Please contact Mali Wash directly.');
+      return;
+    }
+
+    const lastSubmit = Number(localStorage.getItem(BOOKING_COOLDOWN_KEY) || 0);
+    if (Date.now() - lastSubmit < BOOKING_COOLDOWN_MS) {
+      setError('Your previous request was received. Please wait a minute before booking again.');
+      return;
+    }
 
     if (!isValidPhone(formData.phone)) {
       setError('Enter a valid Zimbabwean WhatsApp number, for example 0771234567.');
@@ -52,20 +100,29 @@ export default function PublicBooking() {
       return;
     }
 
-    const bookingId = uuidv4();
-    await db.bookings.add({
-      id: bookingId,
-      name: formData.name.trim(),
-      phone: normalisePhone(formData.phone)!,
-      vehicle: formData.vehicle.trim(),
-      serviceType: selectedService.id,
-      requestedTime: requestedTime,
-      status: 'pending',
-      createdAt: Date.now(),
-      syncStatus: 'pending_sync'
-    });
-    void notifyLocalWrite();
-    setSubmitted(true);
+    setSubmitting(true);
+    try {
+      const bookingId = uuidv4();
+      await setDoc(doc(firestore, 'bookings', bookingId), {
+        id: bookingId,
+        name: formData.name.trim(),
+        phone: normalisePhone(formData.phone)!,
+        vehicle: formData.vehicle.trim(),
+        serviceType: selectedService.id,
+        requestedTime,
+        status: 'pending',
+        createdAt: Date.now()
+      });
+      localStorage.setItem(BOOKING_COOLDOWN_KEY, String(Date.now()));
+      setSubmitted(true);
+    } catch (err: any) {
+      const denied = err?.code === 'permission-denied' || err?.code === 'failed-precondition';
+      setError(denied
+        ? 'Booking protection is not active yet. Please contact Mali Wash directly.'
+        : 'Your request could not be delivered. Check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -141,7 +198,7 @@ export default function PublicBooking() {
                 className="flex h-12 w-full rounded-md border border-ink-300 bg-white px-4 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600"
                 value={formData.serviceType}
                 onChange={e => setFormData({...formData, serviceType: e.target.value})}
-                disabled={!settings || washServices.length === 0}
+                disabled={loadingSettings || !settings || washServices.length === 0}
               >
                 {washServices.map(service => (
                   <option key={service.id} value={service.id}>
@@ -171,8 +228,8 @@ export default function PublicBooking() {
                 />
               </div>
             </div>
-            <Button type="submit" disabled={!settings || washServices.length === 0} className="w-full mt-4 h-14 text-lg">
-              Request Booking
+            <Button type="submit" disabled={submitting || loadingSettings || !settings || washServices.length === 0} className="w-full mt-4 h-14 text-lg">
+              {submitting ? 'Sending request…' : loadingSettings ? 'Loading services…' : 'Request Booking'}
             </Button>
           </form>
         </CardContent>
