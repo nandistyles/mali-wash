@@ -84,11 +84,11 @@ export default function Customers() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-full w-full p-6 bg-slate-50 overflow-hidden">
+    <div className="flex flex-col lg:flex-row gap-6 h-full w-full p-6 bg-ink-50 overflow-hidden">
       <Card className="flex-1 flex flex-col h-full shrink-0 min-w-0">
-        <div className="p-4 border-b border-slate-200">
+        <div className="p-4 border-b border-ink-200">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400 w-5 h-5" />
             <Input
               placeholder="Search name, phone, or vehicle reg…"
               className="pl-10"
@@ -99,28 +99,28 @@ export default function Customers() {
         </div>
         <div className="flex-1 overflow-auto">
           {customers.length === 0 ? (
-            <div className="p-8 text-center text-slate-500">No customers found.</div>
+            <div className="p-8 text-center text-ink-500">No customers found.</div>
           ) : (
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-ink-100">
               {customers.map(customer => (
                 <button
                   key={customer.id}
                   onClick={() => setSelectedId(customer.id)}
-                  className={`w-full text-left p-4 hover:bg-slate-50 transition-colors flex justify-between items-center gap-3 ${
-                    selectedId === customer.id ? 'bg-teal-50 border-l-4 border-teal-600' : 'border-l-4 border-transparent'
+                  className={`w-full text-left p-4 hover:bg-ink-50 transition-colors flex justify-between items-center gap-3 ${
+                    selectedId === customer.id ? 'bg-brand-50 border-l-4 border-brand-600' : 'border-l-4 border-transparent'
                   }`}
                 >
                   <div className="min-w-0">
-                    <div className="font-semibold text-slate-900 truncate">{customer.name}</div>
-                    <div className="text-sm text-slate-500">{formatPhone(customer.phone)}</div>
+                    <div className="font-semibold text-ink-900 truncate">{customer.name}</div>
+                    <div className="text-sm text-ink-500">{formatPhone(customer.phone)}</div>
                     {customer.vehicles?.[0] && (
-                      <div className="text-xs text-slate-400 truncate">
+                      <div className="text-xs text-ink-400 truncate">
                         {[customer.vehicles[0].reg, customer.vehicles[0].makeModel].filter(Boolean).join(' · ')}
                       </div>
                     )}
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-teal-700 font-bold">{customer.pointsBalance} pts</div>
+                    <div className="text-brand-700 font-bold">{customer.pointsBalance} pts</div>
                   </div>
                 </button>
               ))}
@@ -135,48 +135,48 @@ export default function Customers() {
             <CardContent className="p-6">
               <div className="flex justify-between items-start mb-5 gap-4">
                 <div className="min-w-0">
-                  <h2 className="text-2xl font-bold text-slate-900 truncate">{selected.name}</h2>
-                  <p className="text-lg text-slate-600">{formatPhone(selected.phone)}</p>
+                  <h2 className="text-2xl font-bold text-ink-900 truncate">{selected.name}</h2>
+                  <p className="text-lg text-ink-600">{formatPhone(selected.phone)}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <div className="text-3xl font-black text-teal-700">{selected.pointsBalance}</div>
-                  <div className="text-sm text-teal-900 uppercase font-bold tracking-wider">Points</div>
+                  <div className="text-3xl font-black text-brand-700">{selected.pointsBalance}</div>
+                  <div className="text-sm text-brand-900 uppercase font-bold tracking-wider">Points</div>
                 </div>
               </div>
 
               {/* Visit cadence — the number that tells you whether the flywheel
                   is turning for this customer, and who is worth winning back. */}
               <div className="grid grid-cols-3 gap-3 mb-5">
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
-                  <div className="text-xl font-black text-slate-900">{paid.length}</div>
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Visits</div>
+                <div className="bg-ink-50 p-3 rounded-lg border border-ink-200 text-center">
+                  <div className="text-xl font-black text-ink-900">{paid.length}</div>
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-ink-500">Visits</div>
                 </div>
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-center">
-                  <div className="text-xl font-black text-slate-900">{formatCurrency(lifetimeSpend)}</div>
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Lifetime</div>
+                <div className="bg-ink-50 p-3 rounded-lg border border-ink-200 text-center">
+                  <div className="text-xl font-black text-ink-900">{formatCurrency(lifetimeSpend)}</div>
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-ink-500">Lifetime</div>
                 </div>
                 <div className={`p-3 rounded-lg border text-center ${
                   daysSince !== null && daysSince > 30
-                    ? 'bg-amber-50 border-amber-200'
-                    : 'bg-slate-50 border-slate-200'
+                    ? 'bg-accent-50 border-accent-200'
+                    : 'bg-ink-50 border-ink-200'
                 }`}>
-                  <div className="text-xl font-black text-slate-900">
+                  <div className="text-xl font-black text-ink-900">
                     {daysSince === null ? '—' : `${daysSince}d`}
                   </div>
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-slate-500">Since last</div>
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-ink-500">Since last</div>
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4 mb-5">
-                <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-                  <div className="text-sm text-slate-500 font-medium mb-1 flex items-center">
+                <div className="bg-ink-50 p-4 rounded-lg border border-ink-200">
+                  <div className="text-sm text-ink-500 font-medium mb-1 flex items-center">
                     <Award className="w-4 h-4 mr-1" /> Membership
                   </div>
-                  <div className="font-semibold text-slate-900 text-sm">
+                  <div className="font-semibold text-ink-900 text-sm">
                     {describeMembership(membership ?? null)}
                   </div>
                 </div>
-                <div className="bg-teal-50 p-4 rounded-lg border border-teal-100 text-teal-900 flex flex-col items-center justify-center">
+                <div className="bg-brand-50 p-4 rounded-lg border border-brand-100 text-brand-900 flex flex-col items-center justify-center">
                   <div className="text-xs font-semibold uppercase tracking-wider mb-1">Referral Code</div>
                   <div className="text-lg font-mono font-bold">{selected.referralCode}</div>
                   <Button
@@ -194,7 +194,7 @@ export default function Customers() {
               </div>
 
               {(referred?.length ?? 0) > 0 && (
-                <div className="mb-5 p-3 bg-teal-50 border border-teal-200 rounded-lg flex items-center gap-2 text-sm text-teal-900">
+                <div className="mb-5 p-3 bg-brand-50 border border-brand-200 rounded-lg flex items-center gap-2 text-sm text-brand-900">
                   <Users className="w-4 h-4" />
                   <span>
                     Brought in <b>{referred!.length}</b> customer{referred!.length === 1 ? '' : 's'} ·
@@ -204,23 +204,23 @@ export default function Customers() {
               )}
 
               <div className="mb-5">
-                <h3 className="font-semibold text-slate-900 flex items-center justify-between mb-2 text-sm">
+                <h3 className="font-semibold text-ink-900 flex items-center justify-between mb-2 text-sm">
                   <span className="flex items-center"><Car className="w-4 h-4 mr-2" /> Vehicles</span>
-                  <button onClick={() => setShowAddVehicle(v => !v)} className="text-teal-600 hover:text-teal-800 flex items-center gap-1 text-xs font-bold">
+                  <button onClick={() => setShowAddVehicle(v => !v)} className="text-brand-600 hover:text-brand-800 flex items-center gap-1 text-xs font-bold">
                     <Plus className="w-3 h-3" /> Add
                   </button>
                 </h3>
                 {selected.vehicles?.length ? (
                   <div className="space-y-1">
                     {selected.vehicles.map((v, i) => (
-                      <div key={i} className="text-sm px-3 py-2 bg-slate-50 rounded border border-slate-100 flex justify-between">
-                        <span className="font-mono font-bold text-slate-800">{v.reg || '—'}</span>
-                        <span className="text-slate-500">{v.makeModel}</span>
+                      <div key={i} className="text-sm px-3 py-2 bg-ink-50 rounded border border-ink-100 flex justify-between">
+                        <span className="font-mono font-bold text-ink-800">{v.reg || '—'}</span>
+                        <span className="text-ink-500">{v.makeModel}</span>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-slate-400 italic">None recorded.</p>
+                  <p className="text-sm text-ink-400 italic">None recorded.</p>
                 )}
                 {showAddVehicle && (
                   <div className="mt-2 flex gap-2">
@@ -240,33 +240,33 @@ export default function Customers() {
               </div>
 
               <div className="mb-5">
-                <h3 className="font-semibold text-slate-900 flex items-center mb-3 text-sm">
+                <h3 className="font-semibold text-ink-900 flex items-center mb-3 text-sm">
                   <History className="w-4 h-4 mr-2" /> Visits
                 </h3>
                 <div className="space-y-2">
                   {(transactions?.length ?? 0) === 0 ? (
-                    <p className="text-sm text-slate-500">No visits recorded.</p>
+                    <p className="text-sm text-ink-500">No visits recorded.</p>
                   ) : (
                     transactions!.slice(0, 8).map(t => (
                       <div
                         key={t.id}
                         className={`flex justify-between items-center p-3 rounded-md border text-sm ${
-                          t.status === 'voided' ? 'border-red-100 bg-red-50 opacity-70' : 'border-slate-100 bg-slate-50'
+                          t.status === 'voided' ? 'border-red-100 bg-red-50 opacity-70' : 'border-ink-100 bg-ink-50'
                         }`}
                       >
                         <div className="min-w-0">
-                          <div className="font-medium text-slate-900 truncate">
+                          <div className="font-medium text-ink-900 truncate">
                             {t.lineItems[0]?.description ?? 'Sale'}
                             {t.lineItems.length > 1 && ` +${t.lineItems.length - 1}`}
                           </div>
-                          <div className="text-slate-500 text-xs">
+                          <div className="text-ink-500 text-xs">
                             {new Date(t.createdAt).toLocaleDateString('en-GB')}
                             {t.status === 'voided' && <span className="text-red-600 font-bold ml-2">VOIDED</span>}
                           </div>
                         </div>
                         <div className="text-right shrink-0 ml-2">
-                          <div className="font-semibold text-slate-900">{formatCurrency(t.amount)}</div>
-                          {t.pointsEarned > 0 && <div className="text-teal-600 text-xs">+{t.pointsEarned} pts</div>}
+                          <div className="font-semibold text-ink-900">{formatCurrency(t.amount)}</div>
+                          {t.pointsEarned > 0 && <div className="text-brand-600 text-xs">+{t.pointsEarned} pts</div>}
                           {isAdmin && t.status === 'completed' && (
                             <button
                               onClick={async () => {
@@ -288,20 +288,20 @@ export default function Customers() {
               {/* The points ledger is the source of truth; the balance above is
                   a cached total. Showing both makes a drift visible. */}
               <div>
-                <h3 className="font-semibold text-slate-900 flex items-center mb-3 text-sm">
+                <h3 className="font-semibold text-ink-900 flex items-center mb-3 text-sm">
                   <Star className="w-4 h-4 mr-2" /> AutoPoints ledger
                 </h3>
                 <div className="space-y-1 max-h-56 overflow-y-auto">
                   {(ledger?.length ?? 0) === 0 ? (
-                    <p className="text-sm text-slate-500">No points activity.</p>
+                    <p className="text-sm text-ink-500">No points activity.</p>
                   ) : (
                     ledger!.map(e => (
-                      <div key={e.id} className="flex justify-between items-center px-3 py-2 text-xs border-b border-slate-100">
+                      <div key={e.id} className="flex justify-between items-center px-3 py-2 text-xs border-b border-ink-100">
                         <div className="min-w-0">
-                          <span className="text-slate-700">{e.reason}</span>
-                          <span className="text-slate-400 ml-2">{new Date(e.createdAt).toLocaleDateString('en-GB')}</span>
+                          <span className="text-ink-700">{e.reason}</span>
+                          <span className="text-ink-400 ml-2">{new Date(e.createdAt).toLocaleDateString('en-GB')}</span>
                         </div>
-                        <span className={`font-bold shrink-0 ml-2 ${e.points >= 0 ? 'text-teal-600' : 'text-slate-500'}`}>
+                        <span className={`font-bold shrink-0 ml-2 ${e.points >= 0 ? 'text-brand-600' : 'text-ink-500'}`}>
                           {e.points >= 0 ? '+' : ''}{e.points}
                         </span>
                       </div>
@@ -312,7 +312,7 @@ export default function Customers() {
                   const ledgerTotal = ledger.reduce((s, e) => s + e.points, 0);
                   if (ledgerTotal === selected.pointsBalance) return null;
                   return (
-                    <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs text-amber-900 flex items-center gap-2">
+                    <div className="mt-2 p-2 bg-accent-50 border border-accent-200 rounded text-xs text-accent-900 flex items-center gap-2">
                       <TrendingUp className="w-3 h-3" />
                       Ledger totals {ledgerTotal} but the cached balance says {selected.pointsBalance}.
                     </div>
@@ -323,8 +323,8 @@ export default function Customers() {
           </Card>
         </div>
       ) : (
-        <div className="flex-1 hidden lg:flex items-center justify-center border-2 border-dashed border-slate-200 rounded-lg bg-slate-50">
-          <div className="text-center text-slate-400">
+        <div className="flex-1 hidden lg:flex items-center justify-center border-2 border-dashed border-ink-200 rounded-lg bg-ink-50">
+          <div className="text-center text-ink-400">
             <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
             <p className="font-medium">Select a customer</p>
           </div>

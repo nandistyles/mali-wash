@@ -22,94 +22,91 @@ export default function Layout() {
     { path: '/shifts', label: 'Shifts', icon: Clock },
     { path: '/bookings', label: 'Bookings', icon: Calendar },
     { path: '/growth', label: 'Growth', icon: TrendingUp },
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { path: '/dashboard', label: 'Reports', icon: LayoutDashboard },
     ...(isAdmin ? [{ path: '/settings', label: 'Settings', icon: SettingsIcon }] : []),
   ];
 
   /*
    * The old header showed "Online · Synced" unconditionally whenever the
    * browser reported a connection — including while every push was being
-   * rejected. It now distinguishes connected, queued, and failing, because on
-   * this network those are three different situations and only one is fine.
+   * rejected. It distinguishes connected, queued, and failing, because on this
+   * network those are three different situations and only one is fine.
    */
   const status = !configured
-    ? { dot: 'bg-slate-400', label: pendingCount > 0 ? `Local only · ${pendingCount}` : 'Local only' }
+    ? { dot: 'bg-ink-400', ring: 'bg-ink-400/30', label: pendingCount > 0 ? `Local only · ${pendingCount}` : 'Local only' }
     : !signedIn
-    ? { dot: 'bg-slate-400', label: pendingCount > 0 ? `Not syncing · ${pendingCount}` : 'Not syncing' }
+    ? { dot: 'bg-ink-400', ring: 'bg-ink-400/30', label: pendingCount > 0 ? `Not syncing · ${pendingCount}` : 'Not syncing' }
     : !isOnline
-    ? { dot: 'bg-amber-400', label: pendingCount > 0 ? `Offline · ${pendingCount} queued` : 'Offline' }
+    ? { dot: 'bg-accent-300', ring: 'bg-accent-300/30', label: pendingCount > 0 ? `Offline · ${pendingCount} queued` : 'Offline' }
     : lastError
-      ? { dot: 'bg-red-400', label: 'Sync failing' }
-      : syncing
-        ? { dot: 'bg-sky-400', label: 'Syncing…' }
-        : pendingCount > 0
-          ? { dot: 'bg-amber-400', label: `${pendingCount} queued` }
-          : { dot: 'bg-emerald-400', label: 'Synced' };
+    ? { dot: 'bg-red-400', ring: 'bg-red-400/30', label: 'Sync failing' }
+    : syncing
+    ? { dot: 'bg-sky-300', ring: 'bg-sky-300/30', label: 'Syncing…' }
+    : pendingCount > 0
+    ? { dot: 'bg-accent-300', ring: 'bg-accent-300/30', label: `${pendingCount} queued` }
+    : { dot: 'bg-emerald-400', ring: 'bg-emerald-400/30', label: 'Synced' };
+
+  const initials = (staff?.name ?? '?')
+    .split(' ').filter(Boolean).slice(0, 2).map(p => p[0]?.toUpperCase()).join('');
 
   return (
-    <div className="flex flex-col h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
-      <header className="h-16 bg-[#004D4D] flex items-center justify-between px-6 text-white shrink-0 border-b-4 border-teal-600">
-        <div className="flex items-center gap-4">
-          <div className="bg-white p-1.5 rounded-lg text-[#004D4D]">
-            <Car className="w-6 h-6" />
+    <div className="flex flex-col h-screen bg-background font-sans text-foreground overflow-hidden">
+      <header className="h-16 brand-gradient flex items-center justify-between px-5 text-white shrink-0 shadow-lg relative z-20">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="bg-white/95 p-2 rounded-xl text-brand-800 shadow-sm shrink-0">
+            <Car className="w-5 h-5" strokeWidth={2.5} />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">MALI WASH</h1>
-          <div className="h-6 w-px bg-teal-800 mx-2"></div>
+          <div className="leading-none mr-2">
+            <h1 className="text-lg font-bold tracking-tight">MALI WASH</h1>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-brand-200/80 mt-1">Ruwa</p>
+          </div>
 
           <button
             onClick={triggerSync}
             title={lastError || 'Tap to sync now'}
-            className="flex items-center gap-2 text-sm bg-teal-900/50 px-3 py-1 rounded-full border border-teal-400/30 hover:bg-teal-900/80 transition-colors"
+            className="pressable group flex items-center gap-2 bg-white/10 hover:bg-white/18 px-3 h-9 rounded-full border border-white/15 backdrop-blur-sm"
           >
-            <div className={`w-2 h-2 rounded-full ${status.dot}`}></div>
-            <span className="font-semibold uppercase tracking-wider text-[10px]">{status.label}</span>
-            <RefreshCw className={`w-3 h-3 opacity-70 ${syncing ? 'animate-spin' : ''}`} />
+            <span className="relative flex w-2 h-2 shrink-0">
+              <span className={`absolute inline-flex h-full w-full rounded-full ${status.ring} ${syncing ? 'animate-ping' : ''}`}></span>
+              <span className={`relative inline-flex rounded-full h-2 w-2 ${status.dot}`}></span>
+            </span>
+            <span className="font-bold uppercase tracking-wider text-[10px] whitespace-nowrap">{status.label}</span>
+            <RefreshCw className={`w-3 h-3 opacity-60 group-hover:opacity-100 transition-opacity ${syncing ? 'animate-spin' : ''}`} />
           </button>
 
           {isDevSession && (
-            <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-400 text-amber-950 px-2 py-1 rounded">
-              Dev session
+            <span className="hidden md:inline text-[10px] font-bold uppercase tracking-wider bg-accent-300 text-brand-950 px-2.5 py-1 rounded-full shadow-sm">
+              Dev
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-6">
-          <div className="text-right hidden sm:block">
-            <p className="text-xs opacity-80 uppercase font-semibold">{staff?.role ?? 'Staff'}</p>
-            <p className="text-sm font-medium">{staff?.name ?? 'Active Session'}</p>
+        <div className="flex items-center gap-3">
+          <div className="text-right hidden sm:block leading-tight">
+            <p className="text-sm font-semibold">{staff?.name ?? 'Active Session'}</p>
+            <p className="text-[10px] uppercase tracking-wider text-brand-200/80 font-bold">{staff?.role ?? 'Staff'}</p>
+          </div>
+          <div className="w-10 h-10 rounded-full bg-white/15 border border-white/20 grid place-items-center text-sm font-bold shrink-0">
+            {initials}
           </div>
           <button
             onClick={handleSignOut}
-            className="flex items-center gap-2 bg-teal-700 px-4 py-2 rounded text-sm font-bold border border-teal-500 hover:bg-teal-600 transition-colors"
+            title="Sign out"
+            className="pressable w-10 h-10 grid place-items-center rounded-xl bg-white/10 hover:bg-white/20 border border-white/15"
           >
             <LogOut className="w-4 h-4" />
-            <span className="hidden sm:inline">Sign Out</span>
           </button>
         </div>
       </header>
 
-      {/* No Mali project configured: sync is deliberately switched off so records
-          cannot land in the AI Studio project the fallback config points at. */}
-      {!configured && (
-        <div className="bg-slate-100 border-b-2 border-slate-300 px-6 py-2 flex items-center gap-3 text-sm text-slate-700 shrink-0">
-          <TriangleAlert className="w-4 h-4 shrink-0" />
-          <span className="flex-1">
-            <b>Local only — no Mali Firebase project configured.</b> Everything works and nothing is lost,
-            but this device is not backed up and no other device can see it. Set <code className="bg-slate-200 px-1 rounded">VITE_FIREBASE_*</code> in <code className="bg-slate-200 px-1 rounded">.env.local</code> to turn sync on.
-            {pendingCount > 0 && <> {pendingCount} record{pendingCount === 1 ? '' : 's'} waiting.</>}
-          </span>
-        </div>
-      )}
-
       {/* A dev session has no Firebase account, so it can never sync. Say so
           plainly rather than letting it look like an outage. */}
       {configured && !signedIn && isDevSession && (
-        <div className="bg-amber-50 border-b-2 border-amber-200 px-6 py-2 flex items-center gap-3 text-sm text-amber-900 shrink-0">
-          <TriangleAlert className="w-4 h-4 shrink-0" />
+        <div className="bg-accent-50 border-b border-accent-200 px-5 py-2.5 flex items-center gap-3 text-sm text-accent-900 shrink-0 animate-in-fade">
+          <TriangleAlert className="w-4 h-4 shrink-0 text-accent-600" />
           <span className="flex-1">
             <b>Dev session — not syncing.</b> This login has no Firebase account, so nothing reaches
-            the <code className="bg-amber-100 px-1 rounded">maliholdings</code> project. Sign in with a real staff
-            email to sync.
+            the <code className="bg-accent-100 px-1.5 py-0.5 rounded text-xs font-mono">maliholdings</code> project.
             {pendingCount > 0 && <> {pendingCount} record{pendingCount === 1 ? '' : 's'} queued locally.</>}
           </span>
         </div>
@@ -117,33 +114,49 @@ export default function Layout() {
 
       {/* A failing sync is silent money loss, so it gets a banner, not a log line. */}
       {configured && lastError && (
-        <div className="bg-red-50 border-b-2 border-red-200 px-6 py-2 flex items-center gap-3 text-sm text-red-800 shrink-0">
-          <TriangleAlert className="w-4 h-4 shrink-0" />
+        <div className="bg-red-50 border-b border-red-200 px-5 py-2.5 flex items-center gap-3 text-sm text-red-900 shrink-0 animate-in-fade">
+          <TriangleAlert className="w-4 h-4 shrink-0 text-red-600" />
           <span className="flex-1 truncate">
-            <b>Sync failing.</b> {pendingCount} record{pendingCount === 1 ? '' : 's'} waiting locally — nothing is lost, but this device is not backed up. {lastError}
+            <b>Sync failing.</b> {pendingCount} record{pendingCount === 1 ? '' : 's'} waiting locally — nothing is lost, but this device is not backed up.
           </span>
-          <button onClick={triggerSync} className="font-bold underline shrink-0">Retry</button>
+          <button onClick={triggerSync} className="font-bold underline shrink-0 hover:no-underline">Retry</button>
         </div>
       )}
 
       <div className="flex flex-1 overflow-hidden">
-        <nav className="w-20 bg-white border-r border-slate-200 flex flex-col items-center py-6 gap-6 shrink-0 overflow-y-auto">
+        <nav className="w-[84px] bg-card border-r border-border flex flex-col items-center py-4 gap-1 shrink-0 overflow-y-auto z-10">
           {navItems.map(item => {
             const active = location.pathname.startsWith(item.path);
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center gap-1 transition-colors ${
-                  active ? 'text-[#004D4D]' : 'text-slate-400 hover:text-slate-600'
-                }`}
+                aria-current={active ? 'page' : undefined}
+                className="pressable group relative flex flex-col items-center gap-1.5 w-full py-2.5 rounded-xl"
               >
-                <div className={`p-3 rounded-xl transition-colors ${
-                  active ? 'bg-teal-100' : 'hover:bg-slate-100'
-                }`}>
-                  <item.icon className="w-6 h-6" />
+                {/* Active rail: a position cue that survives sunlight better
+                    than a colour change alone. */}
+                <span
+                  className={`absolute left-0 top-1/2 -translate-y-1/2 w-1 rounded-r-full bg-brand-600 transition-all duration-200 ${
+                    active ? 'h-9 opacity-100' : 'h-0 opacity-0'
+                  }`}
+                />
+                <div
+                  className={`p-2.5 rounded-xl transition-colors duration-150 ${
+                    active
+                      ? 'bg-brand-100 text-brand-800'
+                      : 'text-ink-400 group-hover:bg-ink-100 group-hover:text-ink-700'
+                  }`}
+                >
+                  <item.icon className="w-[22px] h-[22px]" strokeWidth={active ? 2.4 : 2} />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-center">{item.label}</span>
+                <span
+                  className={`text-[10px] font-bold uppercase tracking-wider text-center leading-none transition-colors ${
+                    active ? 'text-brand-800' : 'text-ink-400 group-hover:text-ink-600'
+                  }`}
+                >
+                  {item.label}
+                </span>
               </Link>
             )
           })}
@@ -154,18 +167,22 @@ export default function Layout() {
         </main>
       </div>
 
-      <footer className="h-8 bg-slate-800 flex items-center justify-between px-6 text-[10px] text-slate-400 font-bold shrink-0">
-        <div>
-          DB SYNC STATUS:{' '}
-          <span className={lastError ? 'text-red-400' : isOnline ? 'text-emerald-400' : 'text-amber-400'}>
-            {isOnline
-              ? `OK ${lastSync ? `(LAST: ${lastSync.toLocaleTimeString()})` : ''}`
-              : 'OFFLINE'}
+      <footer className="h-7 bg-ink-900 flex items-center justify-between px-5 text-[10px] text-ink-400 font-semibold shrink-0 tracking-wide">
+        <div className="flex items-center gap-2">
+          <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+          <span>
+            {configured
+              ? signedIn
+                ? isOnline
+                  ? `SYNCED${lastSync ? ` · ${lastSync.toLocaleTimeString()}` : ''}`
+                  : 'OFFLINE — QUEUING LOCALLY'
+                : 'NOT SYNCING'
+              : 'LOCAL ONLY — NO PROJECT CONFIGURED'}
           </span>
         </div>
-        <div className="flex gap-6 uppercase">
-          <span>{location.pathname.replace('/', '') || 'Dashboard'}</span>
-          <span>© MALI WASH v1.0.4</span>
+        <div className="flex gap-5 uppercase">
+          <span className="text-ink-500">{location.pathname.replace('/', '') || 'pos'}</span>
+          <span className="text-ink-600">MALI WASH v1.1</span>
         </div>
       </footer>
     </div>

@@ -14,13 +14,13 @@ export default function ConfigError() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-ink-50 flex items-center justify-center p-4">
       <div className="w-full max-w-xl bg-white rounded-xl shadow-xl border-2 border-red-200 overflow-hidden">
         <div className="bg-red-600 text-white px-6 py-4">
           <h1 className="text-xl font-bold">Not configured for Mali Wash</h1>
         </div>
 
-        <div className="p-6 space-y-4 text-slate-700">
+        <div className="p-6 space-y-4 text-ink-700">
           <p>
             This build has no Firebase project set, so it would fall back to a bundled
             configuration belonging to a <b>different application</b>. Rather than run
@@ -33,11 +33,11 @@ export default function ConfigError() {
             setting them without rebuilding changes nothing.
           </p>
 
-          <ul className="text-xs font-mono bg-slate-100 rounded border p-3 space-y-1">
+          <ul className="text-xs font-mono bg-ink-100 rounded border p-3 space-y-1">
             {vars.map(v => <li key={v}>{v}</li>)}
           </ul>
 
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-ink-500">
             Values come from the Firebase console under Project settings → Your apps → SDK
             setup and configuration.
           </p>

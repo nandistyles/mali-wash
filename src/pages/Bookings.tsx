@@ -3,17 +3,23 @@ import { db } from '../lib/db';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { CheckCircle2, Clock, Calendar } from 'lucide-react';
 import { Button } from '../components/ui/button';
-import { sendBookingConfirmation } from '../lib/whatsapp';
+import { bookingConfirmationText, openWhatsApp } from '../lib/whatsapp';
+import { notifyLocalWrite } from '../lib/sync';
+import { Link } from 'react-router-dom';
+import { ArrowRight, MessageCircle } from 'lucide-react';
 
 export default function Bookings() {
   const bookings = useLiveQuery(() => db.bookings.orderBy('requestedTime').reverse().toArray());
 
   const handleConfirm = async (id: string, phone: string, name: string, time: number, service: string) => {
+    // Open from the click itself so mobile browsers do not block WhatsApp as a
+    // popup after the asynchronous database write.
+    openWhatsApp(phone, bookingConfirmationText(name, new Date(time).toLocaleString(), service.replaceAll('_', ' ')));
     await db.bookings.update(id, { 
       status: 'confirmed',
       syncStatus: 'pending_sync'
     });
-    await sendBookingConfirmation(phone, name, new Date(time).toLocaleString(), service.replace('_', ' '));
+    void notifyLocalWrite();
   };
 
   const handleComplete = async (id: string) => {
@@ -21,14 +27,15 @@ export default function Bookings() {
       status: 'done',
       syncStatus: 'pending_sync'
     });
+    void notifyLocalWrite();
   };
 
   return (
-    <div className="h-full w-full p-6 overflow-auto bg-slate-50 max-w-5xl mx-auto space-y-6">
+    <div className="h-full w-full p-6 overflow-auto bg-ink-50 max-w-5xl mx-auto space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Wash Bookings</h1>
-          <p className="text-slate-500">Manage online customer requests</p>
+          <h1 className="text-2xl font-bold text-ink-900">Wash Bookings</h1>
+          <p className="text-ink-500">Manage online customer requests</p>
         </div>
         <Button variant="outline" asChild>
           <a href="/book" target="_blank" rel="noopener noreferrer">View Public Form</a>
@@ -37,32 +44,32 @@ export default function Bookings() {
 
       <div className="grid gap-4">
         {bookings?.length === 0 ? (
-          <div className="text-center p-12 bg-white rounded-lg border border-slate-200">
-            <Calendar className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-            <p className="text-lg font-medium text-slate-600">No bookings yet</p>
+          <div className="text-center p-12 bg-white rounded-lg border border-ink-200">
+            <Calendar className="w-12 h-12 text-ink-300 mx-auto mb-3" />
+            <p className="text-lg font-medium text-ink-600">No bookings yet</p>
           </div>
         ) : (
           bookings?.map(booking => (
             <Card key={booking.id} className={`border-l-4 ${
-              booking.status === 'pending' ? 'border-l-amber-500' :
-              booking.status === 'confirmed' ? 'border-l-teal-500' : 'border-l-slate-300'
+              booking.status === 'pending' ? 'border-l-accent-500' :
+              booking.status === 'confirmed' ? 'border-l-brand-500' : 'border-l-ink-300'
             }`}>
               <CardContent className="p-6 flex flex-col md:flex-row gap-6 items-start md:items-center justify-between">
                 <div>
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-bold text-lg text-slate-900">{booking.name}</h3>
+                    <h3 className="font-bold text-lg text-ink-900">{booking.name}</h3>
                     <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider ${
-                      booking.status === 'pending' ? 'bg-amber-100 text-amber-800' :
-                      booking.status === 'confirmed' ? 'bg-teal-100 text-teal-800' : 'bg-slate-100 text-slate-600'
+                      booking.status === 'pending' ? 'bg-accent-100 text-accent-800' :
+                      booking.status === 'confirmed' ? 'bg-brand-100 text-brand-800' : 'bg-ink-100 text-ink-600'
                     }`}>
                       {booking.status}
                     </span>
                   </div>
-                  <div className="text-sm text-slate-600 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
-                    <p><span className="font-medium text-slate-900">Phone:</span> {booking.phone}</p>
-                    <p><span className="font-medium text-slate-900">Vehicle:</span> {booking.vehicle}</p>
-                    <p><span className="font-medium text-slate-900">Service:</span> <span className="capitalize">{booking.serviceType.replace('_', ' ')}</span></p>
-                    <p className="flex items-center text-teal-700 font-medium">
+                  <div className="text-sm text-ink-600 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1">
+                    <p><span className="font-medium text-ink-900">Phone:</span> {booking.phone}</p>
+                    <p><span className="font-medium text-ink-900">Vehicle:</span> {booking.vehicle}</p>
+                    <p><span className="font-medium text-ink-900">Service:</span> <span className="capitalize">{booking.serviceType.replace('_', ' ')}</span></p>
+                    <p className="flex items-center text-brand-700 font-medium">
                       <Clock className="w-4 h-4 mr-1" /> {new Date(booking.requestedTime).toLocaleString()}
                     </p>
                   </div>
@@ -71,20 +78,27 @@ export default function Bookings() {
                 <div className="flex gap-2 w-full md:w-auto">
                   {booking.status === 'pending' && (
                     <Button 
-                      className="w-full md:w-auto bg-amber-500 hover:bg-amber-600"
+                      className="w-full md:w-auto bg-accent-500 hover:bg-accent-600"
                       onClick={() => handleConfirm(booking.id, booking.phone, booking.name, booking.requestedTime, booking.serviceType)}
                     >
-                      Confirm (Send WhatsApp)
+                      <MessageCircle className="w-4 h-4 mr-2" /> Confirm & message
                     </Button>
                   )}
                   {booking.status === 'confirmed' && (
-                    <Button 
-                      variant="outline" 
-                      className="w-full md:w-auto text-teal-700 border-teal-200 bg-teal-50 hover:bg-teal-100"
-                      onClick={() => handleComplete(booking.id)}
-                    >
-                      <CheckCircle2 className="w-4 h-4 mr-2" /> Mark as Done
-                    </Button>
+                    <>
+                      <Button variant="outline" asChild className="w-full md:w-auto">
+                        <Link to={`/pos?booking=${encodeURIComponent(booking.id)}`}>
+                          Check in <ArrowRight className="w-4 h-4 ml-2" />
+                        </Link>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="w-full md:w-auto text-brand-700 border-brand-200 bg-brand-50 hover:bg-brand-100"
+                        onClick={() => handleComplete(booking.id)}
+                      >
+                        <CheckCircle2 className="w-4 h-4 mr-2" /> Done without sale
+                      </Button>
+                    </>
                   )}
                 </div>
               </CardContent>

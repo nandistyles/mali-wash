@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, getSettings } from '../lib/db';
 import { useStaff } from '../lib/auth';
@@ -21,6 +21,9 @@ import type { Customer, PaymentMethod, WashService } from '../types';
 
 export default function POS() {
   const staff = useStaff();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const bookingId = searchParams.get('booking');
+  const loadedBookingId = useRef<string | null>(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<Customer[]>([]);
@@ -41,6 +44,43 @@ export default function POS() {
   const settings = useLiveQuery(() => getSettings());
   const shifts = useLiveQuery(() => db.shifts.where('status').equals('open').toArray(), []);
   const activeShift = shifts?.[0];
+
+  // Turn a confirmed booking into a ready-to-charge sale: attach (or create)
+  // the customer and pre-load the service they chose online.
+  useEffect(() => {
+    if (!bookingId || !settings || loadedBookingId.current === bookingId) return;
+    loadedBookingId.current = bookingId;
+    let cancelled = false;
+
+    void db.bookings.get(bookingId).then(async booking => {
+      if (!booking || booking.status !== 'confirmed') {
+        if (!cancelled) setError('This booking is no longer available for check-in.');
+        return;
+      }
+      const service = settings.services.find(item => item.id === booking.serviceType && item.type === 'wash');
+      if (!service) {
+        if (!cancelled) setError('The booked service is no longer available. Choose a replacement service.');
+        return;
+      }
+      const { customer } = await findOrCreateCustomer({
+        name: booking.name,
+        phone: booking.phone,
+        vehicles: booking.vehicle ? [{ reg: '', makeModel: booking.vehicle }] : []
+      });
+      if (cancelled) return;
+      setSelectedCustomerId(customer.id);
+      setSearchTerm('');
+      setCart([{ service, qty: 1 }]);
+      void notifyLocalWrite();
+    }).catch((err: any) => {
+      if (!cancelled) {
+        loadedBookingId.current = null;
+        setError(err?.message || 'Could not load this booking.');
+      }
+    });
+
+    return () => { cancelled = true; };
+  }, [bookingId, settings]);
 
   // The live customer record, so a points change from a sync shows immediately.
   const selectedCustomer = useLiveQuery(
@@ -107,6 +147,10 @@ export default function POS() {
     setPreview(null);
     setError('');
     setLastSale(null);
+    if (bookingId) {
+      loadedBookingId.current = null;
+      setSearchParams({}, { replace: true });
+    }
   };
 
   const handleProcess = async () => {
@@ -129,6 +173,13 @@ export default function POS() {
       // The sale is safe in Dexie at this point; syncing is best-effort.
       void notifyLocalWrite();
       setLastSale(result);
+      if (bookingId) {
+        // A booking-status write must never make a completed sale look failed,
+        // or the attendant may charge the customer twice.
+        void db.bookings.update(bookingId, { status: 'done', syncStatus: 'pending_sync' })
+          .then(() => notifyLocalWrite())
+          .catch(err => console.warn('Sale completed, but booking status was not updated:', err));
+      }
     } catch (err: any) {
       setError(err?.message || 'Could not complete the sale.');
     } finally {
@@ -186,66 +237,73 @@ export default function POS() {
     { id: 'card' as PaymentMethod, label: 'CARD' },
   ]), []);
 
-  if (!settings) return <div className="p-8 text-center text-slate-500">Loading settings…</div>;
+  if (!settings) return <div className="p-8 text-center text-ink-500">Loading settings…</div>;
 
   return (
-    <div className="flex flex-col lg:flex-row h-full w-full bg-slate-100 overflow-hidden">
+    <div className="flex flex-col lg:flex-row h-full w-full bg-background overflow-hidden">
       <div className="flex-1 flex flex-col p-6 overflow-y-auto">
 
         {/* A sale with no open shift cannot be reconciled, so it is blocked
             rather than silently attributed to a placeholder shift. */}
         {!activeShift && (
-          <div className="mb-6 p-4 bg-amber-50 border-2 border-amber-300 rounded-xl flex items-center gap-3">
-            <Clock className="w-6 h-6 text-amber-600 shrink-0" />
-            <div className="flex-1">
-              <p className="font-bold text-amber-900">No shift is open</p>
-              <p className="text-sm text-amber-800">Open the till so this money can be reconciled at close.</p>
+          <div className="mb-5 p-4 bg-accent-50 border border-accent-200 rounded-xl flex items-center gap-4 shadow-sm animate-in-up">
+            <div className="w-11 h-11 rounded-xl bg-accent-100 grid place-items-center shrink-0">
+              <Clock className="w-5 h-5 text-accent-700" />
             </div>
-            <Link to="/shifts">
-              <Button className="bg-amber-600 hover:bg-amber-700">Open Shift</Button>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-accent-900 leading-tight">No shift is open</p>
+              <p className="text-sm text-accent-800/80 mt-0.5">Open the till so this money can be reconciled at close.</p>
+            </div>
+            <Link to="/shifts" className="shrink-0">
+              <Button variant="accent">Open Shift</Button>
             </Link>
           </div>
         )}
 
-        <div className="mb-2 flex gap-4">
+        <div className="mb-3 flex gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-ink-400 w-5 h-5 pointer-events-none" />
             <input
               type="search"
               placeholder="Search phone, name, or vehicle reg…"
-              className="w-full pl-12 pr-4 py-3 rounded-xl border-2 border-slate-200 focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20 text-lg shadow-sm outline-none transition-all font-medium"
+              className="w-full h-14 pl-12 pr-4 rounded-xl border-2 border-ink-200 bg-card text-lg font-medium text-ink-900 placeholder:text-ink-400 shadow-sm outline-none transition-[border-color,box-shadow] duration-150 hover:border-ink-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-500/12"
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
             />
           </div>
-          <button
-            className="px-6 py-3 bg-[#004D4D] hover:bg-teal-900 text-white font-bold rounded-lg shadow-md flex items-center justify-center gap-2 transition-colors shrink-0"
+          <Button
+            size="lg"
+            variant="primary"
+            className="shrink-0"
             onClick={() => {
               setNewCustomer({ ...newCustomer, phone: searchTerm });
               setShowNewCustomer(true);
             }}
           >
             <UserPlus className="w-5 h-5" />
-            NEW CUSTOMER
-          </button>
+            <span className="hidden sm:inline">New Customer</span>
+          </Button>
         </div>
 
         {results.length > 0 && (
-          <div className="mb-6 bg-white rounded-xl border-2 border-slate-200 shadow-sm divide-y divide-slate-100 overflow-hidden">
+          <div className="mb-5 surface shadow-lg divide-y divide-border overflow-hidden animate-in-up">
             {results.map(c => (
               <button
                 key={c.id}
                 onClick={() => { setSelectedCustomerId(c.id); setSearchTerm(''); setResults([]); }}
-                className="w-full text-left px-4 py-3 hover:bg-teal-50 flex items-center justify-between gap-3 transition-colors"
+                className="w-full text-left px-4 py-3 hover:bg-brand-50 active:bg-brand-100 flex items-center gap-3 transition-colors"
               >
-                <div className="min-w-0">
-                  <p className="font-bold text-slate-800 truncate">{c.name}</p>
-                  <p className="text-sm text-slate-500">{formatPhone(c.phone)}</p>
+                <div className="w-10 h-10 rounded-full bg-brand-100 text-brand-800 grid place-items-center font-bold shrink-0">
+                  {c.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-ink-900 truncate">{c.name}</p>
+                  <p className="text-sm text-ink-500 tabular">{formatPhone(c.phone)}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="text-teal-700 font-bold text-sm">{c.pointsBalance} pts</p>
+                  <p className="text-brand-700 font-bold text-sm tabular">{c.pointsBalance} pts</p>
                   {c.vehicles?.[0] && (
-                    <p className="text-xs text-slate-400 truncate max-w-[140px]">
+                    <p className="text-xs text-ink-400 truncate max-w-[140px]">
                       {c.vehicles[0].reg || c.vehicles[0].makeModel}
                     </p>
                   )}
@@ -256,24 +314,36 @@ export default function POS() {
         )}
 
         <div>
-          <h2 className="text-xl font-bold text-slate-900 mb-4">Select Services</h2>
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+          <h2 className="label-caps mb-3">Select Services</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3">
             {settings.services.map(service => {
               const covered = preview?.lines.find(l => l.service.id === service.id && l.coveredQty > 0);
+              const inCart = cart.find(i => i.service.id === service.id);
               return (
                 <button
                   key={service.id}
                   onClick={() => addToCart(service)}
-                  className="bg-white p-4 rounded-xl shadow-sm border-2 border-slate-100 hover:border-teal-500 hover:shadow-md transition-all text-left flex flex-col h-32 active:scale-95 relative"
+                  className={`pressable group surface p-4 text-left flex flex-col h-36 relative overflow-hidden hover:shadow-md ${
+                    inCart ? 'border-brand-400 ring-2 ring-brand-500/15' : 'hover:border-brand-300'
+                  }`}
                 >
+                  {/* Quantity badge doubles as the confirmation that a tap landed. */}
+                  {inCart && (
+                    <span className="absolute top-0 right-0 bg-brand-600 text-white text-xs font-black w-7 h-7 grid place-items-center rounded-bl-xl tabular">
+                      {inCart.qty}
+                    </span>
+                  )}
                   {covered && (
-                    <span className="absolute top-2 right-2 bg-teal-100 text-teal-800 text-[9px] font-black px-1.5 py-0.5 rounded uppercase">
+                    <span className="absolute bottom-3 right-3 bg-brand-100 text-brand-800 text-[9px] font-black px-1.5 py-1 rounded uppercase tracking-wide">
                       Covered
                     </span>
                   )}
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">{service.type.replace('_', ' ')}</span>
-                  <span className="font-bold text-slate-800 text-lg leading-tight mb-auto">{service.name}</span>
-                  <span className="text-teal-700 font-black text-xl">{formatCurrency(service.price)}</span>
+
+                  <span className="label-caps text-ink-400 mb-1.5">{service.type.replace('_', ' ')}</span>
+                  <span className="font-bold text-ink-900 text-[17px] leading-snug mb-auto pr-6">{service.name}</span>
+                  <span className="text-brand-700 font-black text-2xl tracking-tight tabular">
+                    {formatCurrency(service.price)}
+                  </span>
                 </button>
               );
             })}
@@ -282,32 +352,32 @@ export default function POS() {
       </div>
 
       {/* Checkout */}
-      <aside className="w-full lg:w-[420px] bg-white border-l border-slate-200 flex flex-col shadow-[-10px_0_30px_rgba(0,0,0,0.02)] z-10 shrink-0">
-        <div className={`p-5 border-b-2 ${!selectedCustomer ? 'bg-slate-50 border-slate-200' : 'bg-teal-50 border-teal-200'}`}>
+      <aside className="w-full lg:w-[420px] bg-card border-l border-border flex flex-col shadow-[-8px_0_28px_rgba(13,18,18,0.04)] z-10 shrink-0">
+        <div className={`p-5 border-b transition-colors ${!selectedCustomer ? 'bg-ink-50 border-border' : 'bg-brand-50 border-brand-200'}`}>
           {!selectedCustomer ? (
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-slate-200 flex items-center justify-center text-slate-400">
-                <Search className="w-6 h-6" />
+              <div className="w-12 h-12 rounded-full bg-ink-200/70 flex items-center justify-center text-ink-400">
+                <Search className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-slate-700">Anonymous Walk-in</h3>
-                <p className="text-slate-500 text-sm">No points, no history</p>
+                <h3 className="font-bold text-ink-700 leading-tight">Anonymous Walk-in</h3>
+                <p className="text-ink-500 text-sm mt-0.5">No points, no history</p>
               </div>
             </div>
           ) : (
             <div>
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-12 h-12 rounded-full bg-teal-600 flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0">
+                  <div className="w-12 h-12 rounded-full bg-brand-600 flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0">
                     {selectedCustomer.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-bold text-teal-900 leading-tight truncate">{selectedCustomer.name}</h3>
-                    <p className="text-teal-700 text-xs">{formatPhone(selectedCustomer.phone)}</p>
+                    <h3 className="font-bold text-brand-900 leading-tight truncate">{selectedCustomer.name}</h3>
+                    <p className="text-brand-700 text-xs">{formatPhone(selectedCustomer.phone)}</p>
                     <div className="flex gap-2 items-center mt-1 flex-wrap">
-                      <span className="text-teal-800 text-sm font-bold">{selectedCustomer.pointsBalance} pts</span>
+                      <span className="text-brand-800 text-sm font-bold">{selectedCustomer.pointsBalance} pts</span>
                       {preview?.membershipLabel && (
-                        <span className="bg-teal-200 text-teal-900 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
+                        <span className="bg-brand-200 text-brand-900 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
                           {preview.membershipLabel}
                           {preview.washesRemaining !== null && ` · ${preview.washesRemaining} left`}
                         </span>
@@ -317,14 +387,14 @@ export default function POS() {
                 </div>
                 <button
                   onClick={() => setSelectedCustomerId(null)}
-                  className="p-1.5 text-teal-600 hover:text-teal-900 hover:bg-teal-100 rounded shrink-0"
+                  className="p-1.5 text-brand-600 hover:text-brand-900 hover:bg-brand-100 rounded shrink-0"
                   title="Detach customer"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
               {selectedCustomer.vehicles?.length > 0 && (
-                <div className="mt-2 flex items-center gap-1.5 text-xs text-teal-800">
+                <div className="mt-2 flex items-center gap-1.5 text-xs text-brand-800">
                   <Car className="w-3.5 h-3.5" />
                   {selectedCustomer.vehicles.map(v => [v.reg, v.makeModel].filter(Boolean).join(' · ')).join('  |  ')}
                 </div>
@@ -335,7 +405,7 @@ export default function POS() {
 
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="px-5 pt-4 pb-2">
-            <h2 className="text-sm font-black text-slate-500 uppercase tracking-widest flex justify-between items-center">
+            <h2 className="text-sm font-black text-ink-500 uppercase tracking-widest flex justify-between items-center">
               <span>Cart</span>
               {cart.length > 0 && (
                 <button onClick={() => setCart([])} className="text-red-400 hover:text-red-600 flex items-center gap-1 text-xs">
@@ -347,39 +417,39 @@ export default function POS() {
 
           <div className="flex-1 overflow-y-auto px-5 space-y-3 pb-4">
             {cart.length === 0 ? (
-              <div className="text-slate-400 italic text-sm py-8 text-center bg-slate-50 rounded-lg border border-dashed border-slate-200">
+              <div className="text-ink-400 italic text-sm py-8 text-center bg-ink-50 rounded-lg border border-dashed border-ink-200">
                 Cart is empty.<br />Select services to add.
               </div>
             ) : (
               cart.map(item => {
                 const line = preview?.lines.find(l => l.service.id === item.service.id);
                 return (
-                  <div key={item.service.id} className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                  <div key={item.service.id} className="flex flex-col gap-2 p-3 bg-ink-50 border border-ink-100 rounded-lg">
                     <div className="flex justify-between items-start gap-2">
                       <div className="min-w-0">
-                        <p className="font-bold text-slate-800 leading-tight">{item.service.name}</p>
-                        <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold">{item.service.type}</p>
+                        <p className="font-bold text-ink-800 leading-tight">{item.service.name}</p>
+                        <p className="text-[10px] text-ink-500 uppercase tracking-wider font-semibold">{item.service.type}</p>
                       </div>
                       <div className="text-right shrink-0">
                         {line && line.coveredQty > 0 && line.chargedTotal < line.fullTotal && (
-                          <span className="line-through text-slate-400 text-xs block">{formatCurrency(line.fullTotal)}</span>
+                          <span className="line-through text-ink-400 text-xs block">{formatCurrency(line.fullTotal)}</span>
                         )}
                         <span className="font-bold">{formatCurrency(line?.chargedTotal ?? item.service.price * item.qty)}</span>
                       </div>
                     </div>
 
                     <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-2 bg-white rounded-md border border-slate-200">
-                        <button onClick={() => updateQty(item.service.id, -1)} className="p-1.5 text-slate-500 hover:text-slate-800">
+                      <div className="flex items-center gap-2 bg-white rounded-md border border-ink-200">
+                        <button onClick={() => updateQty(item.service.id, -1)} className="p-1.5 text-ink-500 hover:text-ink-800">
                           <Minus className="w-4 h-4" />
                         </button>
                         <span className="text-sm font-bold w-4 text-center">{item.qty}</span>
-                        <button onClick={() => updateQty(item.service.id, 1)} className="p-1.5 text-slate-500 hover:text-slate-800">
+                        <button onClick={() => updateQty(item.service.id, 1)} className="p-1.5 text-ink-500 hover:text-ink-800">
                           <PlusIcon className="w-4 h-4" />
                         </button>
                       </div>
                       {line && line.coveredQty > 0 && (
-                        <div className="flex items-center gap-1 bg-teal-100 text-teal-800 px-2 py-1 rounded text-xs font-bold">
+                        <div className="flex items-center gap-1 bg-brand-100 text-brand-800 px-2 py-1 rounded text-xs font-bold">
                           <Check className="w-3 h-3" />
                           {line.coveredQty} covered
                         </div>
@@ -391,15 +461,15 @@ export default function POS() {
             )}
           </div>
 
-          <div className="p-5 bg-slate-50 border-t border-slate-200 mt-auto">
+          <div className="p-5 bg-ink-50 border-t border-ink-200 mt-auto">
             {/* Points redemption — the balance was displayed but never spendable. */}
             {selectedCustomer && preview && maxRedeem > 0 && (
-              <div className="mb-4 p-3 bg-white rounded-lg border-2 border-teal-100">
+              <div className="mb-4 p-3 bg-white rounded-lg border-2 border-brand-100">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-teal-800 flex items-center gap-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-brand-800 flex items-center gap-1">
                     <Star className="w-3.5 h-3.5" /> Redeem points
                   </span>
-                  <span className="text-xs text-slate-500">max {maxRedeem}</span>
+                  <span className="text-xs text-ink-500">max {maxRedeem}</span>
                 </div>
                 <input
                   type="range"
@@ -408,43 +478,43 @@ export default function POS() {
                   step={1}
                   value={Math.min(redeemPoints, maxRedeem)}
                   onChange={e => setRedeemPoints(Number(e.target.value))}
-                  className="w-full accent-teal-600"
+                  className="w-full accent-brand-600"
                 />
                 <div className="flex justify-between items-center mt-1 text-sm">
-                  <span className="font-bold text-teal-700">{preview.pointsRedeemed} pts</span>
-                  <span className="font-bold text-teal-700">-{formatCurrency(preview.pointsDiscountUsd)}</span>
+                  <span className="font-bold text-brand-700">{preview.pointsRedeemed} pts</span>
+                  <span className="font-bold text-brand-700">-{formatCurrency(preview.pointsDiscountUsd)}</span>
                 </div>
               </div>
             )}
             {selectedCustomer && preview?.redeemBlockedReason && (
-              <p className="mb-3 text-xs text-slate-500 text-center">{preview.redeemBlockedReason}</p>
+              <p className="mb-3 text-xs text-ink-500 text-center">{preview.redeemBlockedReason}</p>
             )}
 
             <div className="space-y-2 mb-4">
-              <div className="flex justify-between items-center text-slate-500 text-sm font-medium">
+              <div className="flex justify-between items-center text-ink-500 text-sm font-medium">
                 <span>Subtotal</span>
                 <span>{formatCurrency(preview?.subtotal ?? 0)}</span>
               </div>
               {(preview?.membershipDiscount ?? 0) > 0 && (
-                <div className="flex justify-between items-center text-teal-600 text-sm font-bold">
+                <div className="flex justify-between items-center text-brand-600 text-sm font-bold">
                   <span>Membership</span>
                   <span>-{formatCurrency(preview!.membershipDiscount)}</span>
                 </div>
               )}
               {(preview?.pointsDiscountUsd ?? 0) > 0 && (
-                <div className="flex justify-between items-center text-teal-600 text-sm font-bold">
+                <div className="flex justify-between items-center text-brand-600 text-sm font-bold">
                   <span>AutoPoints</span>
                   <span>-{formatCurrency(preview!.pointsDiscountUsd)}</span>
                 </div>
               )}
-              <div className="flex justify-between items-center text-2xl font-black pt-2 border-t border-slate-200">
+              <div className="flex justify-between items-center text-2xl font-black pt-2 border-t border-ink-200">
                 <span>TOTAL</span>
-                <span className={(preview?.total ?? 0) === 0 && cart.length > 0 ? 'text-teal-600' : ''}>
+                <span className={(preview?.total ?? 0) === 0 && cart.length > 0 ? 'text-brand-600' : ''}>
                   {formatCurrency(preview?.total ?? 0)}
                 </span>
               </div>
               {selectedCustomer && (preview?.pointsEarned ?? 0) > 0 && (
-                <p className="text-xs text-teal-700 font-semibold text-right">
+                <p className="text-xs text-brand-700 font-semibold text-right">
                   Earns {preview!.pointsEarned} AutoPoints
                 </p>
               )}
@@ -459,11 +529,11 @@ export default function POS() {
                     onClick={() => setPaymentMethod(method.id)}
                     className={`flex flex-col items-center justify-center py-3 rounded-xl border-2 font-bold text-[10px] sm:text-xs gap-1 transition-colors ${
                       isActive
-                        ? 'bg-teal-50 border-teal-500 text-teal-700'
-                        : 'bg-white border-slate-200 hover:border-slate-300 text-slate-600'
+                        ? 'bg-brand-50 border-brand-500 text-brand-700'
+                        : 'bg-white border-ink-200 hover:border-ink-300 text-ink-600'
                     }`}
                   >
-                    <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-teal-500' : 'bg-slate-400'}`}></div>
+                    <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-brand-500' : 'bg-ink-400'}`}></div>
                     {method.label}
                   </button>
                 );
@@ -480,7 +550,7 @@ export default function POS() {
             <button
               disabled={!canProcess}
               onClick={handleProcess}
-              className="w-full py-4 bg-[#004D4D] disabled:opacity-40 text-white font-black text-lg rounded-xl shadow-lg shadow-teal-900/20 active:scale-95 transition-transform flex items-center justify-center gap-2"
+              className="w-full py-4 bg-brand-900 disabled:opacity-40 text-white font-black text-lg rounded-xl shadow-lg shadow-brand-900/20 active:scale-95 transition-transform flex items-center justify-center gap-2"
             >
               {processing ? <><Loader2 className="w-5 h-5 animate-spin" /> PROCESSING…</> : 'COMPLETE SALE'}
             </button>
@@ -491,24 +561,24 @@ export default function POS() {
       {/* Success — replaces the alert() that blocked the till and told the
           attendant nothing about points, receipts, or what to do next. */}
       {lastSale && (
-        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-ink-900/60 flex items-center justify-center p-4 z-50">
           <Card className="w-full max-w-md shadow-2xl">
             <CardContent className="p-6 text-center">
-              <div className="w-16 h-16 rounded-full bg-teal-100 flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="w-9 h-9 text-teal-600" />
+              <div className="w-16 h-16 rounded-full bg-brand-100 flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-9 h-9 text-brand-600" />
               </div>
-              <h2 className="text-2xl font-black text-slate-900">Sale complete</h2>
-              <p className="text-4xl font-black text-teal-700 my-3">{formatCurrency(lastSale.transaction.amount)}</p>
+              <h2 className="text-2xl font-black text-ink-900">Sale complete</h2>
+              <p className="text-4xl font-black text-brand-700 my-3">{formatCurrency(lastSale.transaction.amount)}</p>
 
-              <div className="text-sm text-slate-600 space-y-1 mb-5">
+              <div className="text-sm text-ink-600 space-y-1 mb-5">
                 {lastSale.transaction.pointsEarned > 0 && (
-                  <p className="font-semibold text-teal-700">+{lastSale.transaction.pointsEarned} AutoPoints earned</p>
+                  <p className="font-semibold text-brand-700">+{lastSale.transaction.pointsEarned} AutoPoints earned</p>
                 )}
                 {lastSale.transaction.pointsRedeemed > 0 && (
                   <p>{lastSale.transaction.pointsRedeemed} points redeemed</p>
                 )}
-                {lastSale.membershipGranted && <p className="font-semibold text-teal-700">Membership activated</p>}
-                {lastSale.referralPaid && <p className="font-semibold text-teal-700">Referral reward paid to the referrer</p>}
+                {lastSale.membershipGranted && <p className="font-semibold text-brand-700">Membership activated</p>}
+                {lastSale.referralPaid && <p className="font-semibold text-brand-700">Referral reward paid to the referrer</p>}
               </div>
 
               <div className="grid grid-cols-2 gap-2 mb-2">
@@ -535,7 +605,7 @@ export default function POS() {
               {selectedCustomer && (
                 <Button
                   variant="outline"
-                  className="w-full h-11 mb-4 flex items-center gap-2 border-teal-300 text-teal-700 hover:bg-teal-50"
+                  className="w-full h-11 mb-4 flex items-center gap-2 border-brand-300 text-brand-700 hover:bg-brand-50"
                   onClick={() => openWhatsApp(
                     selectedCustomer.phone,
                     referralShareText(selectedCustomer.name, selectedCustomer.referralCode, settings.referralRewardPoints)
@@ -566,11 +636,11 @@ export default function POS() {
 
       {/* New customer */}
       {showNewCustomer && (
-        <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50">
+        <div className="fixed inset-0 bg-ink-900/50 flex items-center justify-center p-4 z-50">
           <Card className="w-full max-w-md shadow-2xl">
             <CardHeader className="flex flex-row justify-between items-center border-b pb-4">
               <CardTitle>New Customer</CardTitle>
-              <button onClick={() => setShowNewCustomer(false)} className="p-2 text-slate-400 hover:text-slate-600 rounded-full hover:bg-slate-100">
+              <button onClick={() => setShowNewCustomer(false)} className="p-2 text-ink-400 hover:text-ink-600 rounded-full hover:bg-ink-100">
                 <X className="w-5 h-5" />
               </button>
             </CardHeader>
@@ -581,7 +651,7 @@ export default function POS() {
                 )}
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Phone Number *</label>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Phone Number *</label>
                   <Input
                     required
                     value={newCustomer.phone}
@@ -589,14 +659,14 @@ export default function POS() {
                     placeholder="0771234567"
                   />
                   {newCustomer.phone && !isValidPhone(newCustomer.phone) && (
-                    <p className="text-xs text-amber-600 mt-1">Not a valid Zimbabwean number yet.</p>
+                    <p className="text-xs text-accent-600 mt-1">Not a valid Zimbabwean number yet.</p>
                   )}
                   {duplicateOf && (
-                    <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded text-xs">
-                      <p className="text-amber-900 font-semibold">{duplicateOf.name} already uses this number.</p>
+                    <div className="mt-2 p-2 bg-accent-50 border border-accent-200 rounded text-xs">
+                      <p className="text-accent-900 font-semibold">{duplicateOf.name} already uses this number.</p>
                       <button
                         type="button"
-                        className="text-teal-700 underline font-bold"
+                        className="text-brand-700 underline font-bold"
                         onClick={() => {
                           setSelectedCustomerId(duplicateOf.id);
                           setShowNewCustomer(false);
@@ -610,13 +680,13 @@ export default function POS() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Full Name *</label>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Full Name *</label>
                   <Input required value={newCustomer.name} onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Vehicle Reg</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-1">Vehicle Reg</label>
                     <Input
                       value={newCustomer.reg}
                       onChange={e => setNewCustomer({ ...newCustomer, reg: e.target.value.toUpperCase() })}
@@ -624,13 +694,13 @@ export default function POS() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Make & Model</label>
+                    <label className="block text-sm font-medium text-ink-700 mb-1">Make & Model</label>
                     <Input value={newCustomer.makeModel} onChange={e => setNewCustomer({ ...newCustomer, makeModel: e.target.value })} />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Referred By (Code)</label>
+                  <label className="block text-sm font-medium text-ink-700 mb-1">Referred By (Code)</label>
                   <Input
                     placeholder="e.g. MALI-X4F2K"
                     value={newCustomer.referredByCode}

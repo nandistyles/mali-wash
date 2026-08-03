@@ -4,18 +4,30 @@
  */
 
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import type { ReactNode } from 'react';
+import { lazy, Suspense, type ReactNode } from 'react';
 import { AuthProvider, useAuth } from './lib/auth';
-import Layout from './components/Layout';
-import POS from './pages/POS';
-import Customers from './pages/Customers';
-import Shifts from './pages/Shifts';
-import Dashboard from './pages/Dashboard';
-import Growth from './pages/Growth';
-import Settings from './pages/Settings';
-import Bookings from './pages/Bookings';
-import PublicBooking from './pages/PublicBooking';
-import Login from './pages/Login';
+
+// Each screen is loaded only when it is opened. This keeps the public booking
+// form and the forecourt till from downloading charts and admin screens they do
+// not use, which matters on mobile data and makes cold starts much faster.
+const Layout = lazy(() => import('./components/Layout'));
+const POS = lazy(() => import('./pages/POS'));
+const Customers = lazy(() => import('./pages/Customers'));
+const Shifts = lazy(() => import('./pages/Shifts'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const Growth = lazy(() => import('./pages/Growth'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Bookings = lazy(() => import('./pages/Bookings'));
+const PublicBooking = lazy(() => import('./pages/PublicBooking'));
+const Login = lazy(() => import('./pages/Login'));
+
+function ScreenLoader() {
+  return (
+    <div className="min-h-screen grid place-items-center bg-ink-50 text-brand-700 font-semibold">
+      Loading Mali Wash…
+    </div>
+  );
+}
 
 /**
  * Route guard.
@@ -32,7 +44,7 @@ function AuthGuard({ children }: { children: ReactNode }) {
 
   if (state.status === 'loading') {
     return (
-      <div className="min-h-screen flex items-center justify-center text-teal-600">
+      <div className="min-h-screen flex items-center justify-center text-brand-600">
         Loading…
       </div>
     );
@@ -56,21 +68,23 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <Routes>
-          <Route path="/book" element={<PublicBooking />} />
-          <Route path="/login" element={<Login />} />
+        <Suspense fallback={<ScreenLoader />}>
+          <Routes>
+            <Route path="/book" element={<PublicBooking />} />
+            <Route path="/login" element={<Login />} />
 
-          <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
-            <Route index element={<Navigate to="/pos" replace />} />
-            <Route path="pos" element={<POS />} />
-            <Route path="customers" element={<Customers />} />
-            <Route path="shifts" element={<Shifts />} />
-            <Route path="dashboard" element={<Dashboard />} />
-            <Route path="growth" element={<Growth />} />
-            <Route path="bookings" element={<Bookings />} />
-            <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
-          </Route>
-        </Routes>
+            <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
+              <Route index element={<Navigate to="/pos" replace />} />
+              <Route path="pos" element={<POS />} />
+              <Route path="customers" element={<Customers />} />
+              <Route path="shifts" element={<Shifts />} />
+              <Route path="dashboard" element={<Dashboard />} />
+              <Route path="growth" element={<Growth />} />
+              <Route path="bookings" element={<Bookings />} />
+              <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
+            </Route>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </AuthProvider>
   );

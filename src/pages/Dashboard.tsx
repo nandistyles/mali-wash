@@ -22,18 +22,18 @@ function Stat({ icon: Icon, label, value, sub, tone = 'default' }: {
   tone?: 'default' | 'good' | 'warn';
 }) {
   const toneClass =
-    tone === 'good' ? 'text-teal-700' :
-    tone === 'warn' ? 'text-amber-700' :
-    'text-slate-900';
+    tone === 'good' ? 'text-brand-700' :
+    tone === 'warn' ? 'text-accent-700' :
+    'text-ink-900';
   return (
     <Card>
       <CardContent className="p-5">
-        <div className="flex items-center gap-2 text-slate-500 mb-2">
+        <div className="flex items-center gap-2 text-ink-500 mb-2">
           <Icon className="w-4 h-4" />
           <span className="text-[11px] font-bold uppercase tracking-wider">{label}</span>
         </div>
         <div className={`text-2xl font-black ${toneClass}`}>{value}</div>
-        {sub && <div className="text-xs text-slate-500 mt-1">{sub}</div>}
+        {sub && <div className="text-xs text-ink-500 mt-1">{sub}</div>}
       </CardContent>
     </Card>
   );
@@ -62,20 +62,20 @@ export default function Dashboard() {
     : 0;
 
   return (
-    <div className="h-full w-full overflow-auto bg-slate-50 p-6">
+    <div className="h-full w-full overflow-auto bg-ink-50 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-            <p className="text-slate-500">How the wash is actually doing.</p>
+            <h1 className="text-2xl font-bold text-ink-900">Dashboard</h1>
+            <p className="text-ink-500">How the wash is actually doing.</p>
           </div>
-          <div className="flex gap-1 bg-white border-2 border-slate-200 rounded-lg p-1">
+          <div className="flex gap-1 bg-white border-2 border-ink-200 rounded-lg p-1">
             {PERIODS.map(p => (
               <button
                 key={p.days}
                 onClick={() => setDays(p.days)}
                 className={`px-3 py-1.5 rounded text-sm font-bold transition-colors ${
-                  days === p.days ? 'bg-[#004D4D] text-white' : 'text-slate-600 hover:bg-slate-100'
+                  days === p.days ? 'bg-brand-900 text-white' : 'text-ink-600 hover:bg-ink-100'
                 }`}
               >
                 {p.label}
@@ -85,7 +85,7 @@ export default function Dashboard() {
         </div>
 
         {!metrics ? (
-          <Card><CardContent className="p-12 text-center text-slate-500">Reading the ledger…</CardContent></Card>
+          <Card><CardContent className="p-12 text-center text-ink-500">Reading the ledger…</CardContent></Card>
         ) : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -115,12 +115,12 @@ export default function Dashboard() {
                     return (
                       <div key={m.key}>
                         <div className="flex justify-between items-center text-sm mb-1">
-                          <span className="flex items-center gap-2 text-slate-600">
+                          <span className="flex items-center gap-2 text-ink-600">
                             <m.icon className="w-3.5 h-3.5" /> {m.label}
                           </span>
-                          <span className="font-bold text-slate-900">{formatCurrency(amount)}</span>
+                          <span className="font-bold text-ink-900">{formatCurrency(amount)}</span>
                         </div>
-                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div className="h-2 bg-ink-100 rounded-full overflow-hidden">
                           <div className={`h-full ${m.colour}`} style={{ width: `${pct}%` }} />
                         </div>
                       </div>
