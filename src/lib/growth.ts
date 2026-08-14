@@ -1,6 +1,6 @@
 import { db, getSettings } from './db';
 import { getActiveMembership } from './memberships';
-import type { Customer, Transaction, WashMembership } from '../types';
+import type { BusinessUnit, Customer, Transaction, WashMembership } from '../types';
 
 /**
  * Growth intelligence.
@@ -143,7 +143,7 @@ export interface BusinessMetrics {
   voidedValue: number;
 }
 
-export async function computeMetrics(sinceMs: number, untilMs = Date.now()): Promise<BusinessMetrics> {
+export async function computeMetrics(sinceMs: number, untilMs = Date.now(), business?: BusinessUnit): Promise<BusinessMetrics> {
   const [allTxns, customers, memberships, settings] = await Promise.all([
     db.transactions.where('createdAt').between(sinceMs, untilMs, true, true).toArray(),
     db.customers.toArray(),
@@ -151,8 +151,9 @@ export async function computeMetrics(sinceMs: number, untilMs = Date.now()): Pro
     getSettings()
   ]);
 
-  const completed = allTxns.filter(t => t.status === 'completed');
-  const voided = allTxns.filter(t => t.status === 'voided');
+  const scopedTxns = business ? allTxns.filter(t => t.business === business) : allTxns;
+  const completed = scopedTxns.filter(t => t.status === 'completed');
+  const voided = scopedTxns.filter(t => t.status === 'voided');
 
   const byPaymentMethod = { cash_usd: 0, ecocash: 0, card: 0 };
   for (const t of completed) {
@@ -163,12 +164,12 @@ export async function computeMetrics(sinceMs: number, untilMs = Date.now()): Pro
 
   const revenue = Math.round(completed.reduce((s, t) => s + t.amount, 0) * 100) / 100;
 
-  const newCustomers = customers.filter(c => c.createdAt >= sinceMs && c.createdAt <= untilMs).length;
+  const newCustomers = customers.filter(c => c.createdAt >= sinceMs && c.createdAt <= untilMs && (!business || c.createdByBusiness === business)).length;
 
   // Repeat rate across all history, not just the window — a window shorter than
   // the visit gap would report near-zero repeat and read as a collapse.
   const visitCounts = new Map<string, number>();
-  const everyCompleted = await db.transactions.filter(t => t.status === 'completed').toArray();
+  const everyCompleted = await db.transactions.filter(t => t.status === 'completed' && (!business || t.business === business)).toArray();
   for (const t of everyCompleted) {
     if (t.customerId) visitCounts.set(t.customerId, (visitCounts.get(t.customerId) ?? 0) + 1);
   }
@@ -186,7 +187,7 @@ export async function computeMetrics(sinceMs: number, untilMs = Date.now()): Pro
   ) / 100;
 
   const now = Date.now();
-  const active = memberships.filter(m => m.tier !== 'none' && (m.expiry === null || m.expiry > now));
+  const active = business && business !== 'wash' ? [] : memberships.filter(m => m.tier !== 'none' && (m.expiry === null || m.expiry > now));
   const membershipMrr = active.reduce((sum, m) => {
     const plan = settings.membershipPlans.find(p => p.tier === m.tier);
     const service = plan ? settings.services.find(s => s.id === plan.id) : undefined;
@@ -217,11 +218,11 @@ export async function computeMetrics(sinceMs: number, untilMs = Date.now()): Pro
 }
 
 /** Revenue per day across a window, for the trend chart. */
-export async function dailyRevenue(days: number): Promise<{ date: string; amount: number; visits: number }[]> {
+export async function dailyRevenue(days: number, business?: BusinessUnit): Promise<{ date: string; amount: number; visits: number }[]> {
   const since = Date.now() - days * DAY;
   const txns = await db.transactions
     .where('createdAt').aboveOrEqual(since)
-    .filter(t => t.status === 'completed')
+    .filter(t => t.status === 'completed' && (!business || t.business === business))
     .toArray();
 
   const buckets = new Map<string, { amount: number; visits: number }>();

@@ -16,6 +16,9 @@ const PublicBooking = lazy(() => import('./pages/PublicBooking'));
 const Login = lazy(() => import('./pages/Login'));
 const HoldingsOverview = lazy(() => import('./pages/HoldingsOverview'));
 const BusinessWorkspace = lazy(() => import('./pages/BusinessWorkspace'));
+const PartsOperations = lazy(() => import('./pages/PartsOperations'));
+const DriveOperations = lazy(() => import('./pages/DriveOperations'));
+const TrackOperations = lazy(() => import('./pages/TrackOperations'));
 
 function ScreenLoader() {
   return (
@@ -59,6 +62,12 @@ function AdminOnly({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+function BusinessOnly({ business, children }: { business: string; children: ReactNode }) {
+  const { canOperate } = useAuth();
+  if (!canOperate(business)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -70,8 +79,11 @@ export default function App() {
             <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
               <Route index element={<HoldingsOverview />} />
               <Route path=":business" element={<BusinessWorkspace />} />
-              <Route path="wash/pos" element={<POS />} />
-              <Route path="pos" element={<POS />} />
+              <Route path="wash/pos" element={<BusinessOnly business="wash"><POS /></BusinessOnly>} />
+              <Route path="parts/operations" element={<BusinessOnly business="parts"><PartsOperations /></BusinessOnly>} />
+              <Route path="drive/operations" element={<BusinessOnly business="drive"><DriveOperations /></BusinessOnly>} />
+              <Route path="track/operations" element={<BusinessOnly business="track"><TrackOperations /></BusinessOnly>} />
+              <Route path="pos" element={<BusinessOnly business="wash"><POS /></BusinessOnly>} />
               <Route path="customers" element={<Customers />} />
               <Route path="shifts" element={<Shifts />} />
               <Route path="dashboard" element={<Dashboard />} />

@@ -7,6 +7,7 @@ import PageHeader from '../components/PageHeader';
 import {
   DollarSign, Receipt, Users, Repeat, CreditCard, Star, TriangleAlert, Banknote, Smartphone
 } from 'lucide-react';
+import type { BusinessUnit } from '../types';
 
 const DAY = 24 * 60 * 60 * 1000;
 const PERIODS = [
@@ -42,21 +43,22 @@ function Stat({ icon: Icon, label, value, sub, tone = 'default' }: {
 
 export default function Dashboard() {
   const [days, setDays] = useState(30);
+  const [business, setBusiness] = useState<'all' | BusinessUnit>('all');
   const [metrics, setMetrics] = useState<BusinessMetrics | null>(null);
   const [chart, setChart] = useState<{ date: string; amount: number; visits: number }[]>([]);
 
   useEffect(() => {
     let cancelled = false;
     void Promise.all([
-      computeMetrics(Date.now() - days * DAY),
-      dailyRevenue(Math.min(days, 30))
+      computeMetrics(Date.now() - days * DAY, Date.now(), business === 'all' ? undefined : business),
+      dailyRevenue(Math.min(days, 30), business === 'all' ? undefined : business)
     ]).then(([m, c]) => {
       if (cancelled) return;
       setMetrics(m);
       setChart(c);
     });
     return () => { cancelled = true; };
-  }, [days]);
+  }, [days, business]);
 
   const methodTotal = metrics
     ? metrics.byPaymentMethod.cash_usd + metrics.byPaymentMethod.ecocash + metrics.byPaymentMethod.card
@@ -65,8 +67,12 @@ export default function Dashboard() {
   return (
     <div className="mali-page">
       <div className="mali-page-inner max-w-[92rem]">
-        <PageHeader eyebrow="Business intelligence" title="Performance" description="The wash in numbers—revenue quality, customer behavior, payment mix, and loyalty exposure." action={
-          <div className="flex gap-1 bg-white border-2 border-ink-200 rounded-lg p-1">
+        <PageHeader eyebrow="Mali Holdings intelligence" title="Group performance" description="Revenue, customer behavior, payment mix, and loyalty exposure across every Mali business." action={
+          <div className="flex flex-wrap justify-end gap-2">
+          <select value={business} onChange={event => setBusiness(event.target.value as 'all' | BusinessUnit)} className="h-11 rounded-xl border border-ink-200 bg-white px-3 text-sm font-bold text-ink-700">
+            <option value="all">All businesses</option><option value="wash">Wash</option><option value="parts">Parts</option><option value="drive">Drive</option><option value="track">Track</option>
+          </select>
+          <div className="flex gap-1 bg-white border border-ink-200 rounded-xl p-1">
             {PERIODS.map(p => (
               <button
                 key={p.days}
@@ -78,7 +84,7 @@ export default function Dashboard() {
                 {p.label}
               </button>
             ))}
-          </div>
+          </div></div>
         } />
 
         {!metrics ? (

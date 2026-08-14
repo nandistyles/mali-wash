@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Customer, WashMembership, Transaction, PointsLedgerEntry, Staff, Shift, ReferralRedemption, Booking, Settings } from '../types';
+import type { Customer, WashMembership, Transaction, PointsLedgerEntry, Staff, Shift, ReferralRedemption, Booking, Settings, InventoryItem, FitmentJob, TrackingDevice, TrackingSubscription } from '../types';
 
 export const DEFAULT_SETTINGS: Settings = {
   id: 'global',
@@ -46,6 +46,10 @@ export class MaliWashDB extends Dexie {
   referralRedemptions!: Table<ReferralRedemption, string>;
   bookings!: Table<Booking, string>;
   settings!: Table<Settings, string>;
+  inventoryItems!: Table<InventoryItem, string>;
+  fitmentJobs!: Table<FitmentJob, string>;
+  trackingDevices!: Table<TrackingDevice, string>;
+  trackingSubscriptions!: Table<TrackingSubscription, string>;
 
   constructor() {
     super('MaliWashDB');
@@ -87,6 +91,13 @@ export class MaliWashDB extends Dexie {
           syncStatus: 'pending_sync'
         });
       }
+    });
+
+    this.version(5).stores({
+      inventoryItems: 'id, business, sku, name, category, stockQty, updatedAt, syncStatus',
+      fitmentJobs: 'id, customerId, status, scheduledAt, updatedAt, syncStatus',
+      trackingDevices: 'id, serialNumber, imei, status, customerId, updatedAt, syncStatus',
+      trackingSubscriptions: 'id, customerId, deviceId, status, renewalAt, updatedAt, syncStatus'
     });
   }
 }
