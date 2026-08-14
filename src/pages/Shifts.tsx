@@ -8,6 +8,9 @@ import { Button } from '../components/ui/button';
 import { formatCurrency } from '../lib/utils';
 import { useStaff } from '../lib/auth';
 import { notifyLocalWrite } from '../lib/sync';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
+import { History } from 'lucide-react';
 
 export default function Shifts() {
   const staff = useStaff();
@@ -77,11 +80,9 @@ export default function Shifts() {
   };
 
   return (
-    <div className="h-full w-full p-6 overflow-auto bg-ink-50 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink-900">Till & Shift Management</h1>
-        <p className="text-ink-500">Open and close the daily till</p>
-      </div>
+    <div className="mali-page">
+      <div className="mali-page-inner max-w-5xl">
+      <PageHeader eyebrow="Wash operations" title="Till & shifts" description="Open with confidence, reconcile every payment, and make the close of day unmistakably clear." />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Active Shift Card */}
@@ -206,11 +207,12 @@ export default function Shifts() {
                 </div>
               ))}
               {(!shifts || shifts.filter(s => s.status === 'closed').length === 0) && (
-                <div className="text-center text-ink-500 py-4">No closed shifts yet.</div>
+                <EmptyState compact icon={History} title="No closed shifts yet" description="Your first reconciled shift will appear here with payment totals and variance." />
               )}
             </div>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );

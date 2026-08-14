@@ -16,11 +16,11 @@ export default defineConfig(() => {
         // icons that 404'd in production.
         includeAssets: ['favicon.svg', 'favicon-48x48.png', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
-          name: 'Mali Wash',
+          name: 'Mali Holdings · Wash',
           short_name: 'Mali Wash',
-          description: 'Mali Wash POS & Management System',
-          theme_color: '#134e4a', // teal-900
-          background_color: '#f8fafc',
+          description: 'Mali Holdings customer, loyalty and wash operations platform',
+          theme_color: '#063e3d',
+          background_color: '#f6f8f8',
           display: 'standalone',
           icons: [
             {
@@ -45,6 +45,17 @@ export default defineConfig(() => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/firebase') || id.includes('node_modules/@firebase')) return 'firebase';
+            if (id.includes('node_modules/react') || id.includes('node_modules/react-router')) return 'react';
+            if (id.includes('node_modules/dexie')) return 'offline-db';
+          }
+        }
+      }
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

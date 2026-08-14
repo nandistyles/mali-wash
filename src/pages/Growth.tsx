@@ -12,6 +12,8 @@ import { formatPhone } from '../lib/phone';
 import { formatCurrency } from '../lib/utils';
 import { Card, CardContent } from '../components/ui/card';
 import { MessageCircle, Check, RefreshCw, Users, Clock, Star, CreditCard, Trophy } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 /**
  * The daily growth worklist.
@@ -136,20 +138,16 @@ export default function Growth() {
   };
 
   return (
-    <div className="h-full w-full overflow-auto bg-ink-50 p-6">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-ink-900">Growth</h1>
-            <p className="text-ink-500">Who to talk to today, and what to say.</p>
-          </div>
+    <div className="mali-page">
+      <div className="mali-page-inner max-w-6xl">
+        <PageHeader eyebrow="Revenue engine" title="Growth desk" description="Know exactly who to talk to today—and why that conversation matters." action={
           <button
             onClick={load}
-            className="flex items-center gap-2 px-3 py-2 bg-white border-2 border-ink-200 rounded-lg text-sm font-bold text-ink-600 hover:border-brand-400"
+            className="pressable flex items-center gap-2 px-4 h-11 bg-white border border-border rounded-xl text-sm font-extrabold text-ink-700 shadow-xs hover:border-brand-400"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> Refresh
           </button>
-        </div>
+        } />
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
           {tabs.map(tab => {
@@ -178,17 +176,7 @@ export default function Growth() {
         {!insights ? (
           <Card><CardContent className="p-12 text-center text-ink-500">Reading the ledger…</CardContent></Card>
         ) : rows.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center text-ink-500">
-              <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p className="font-medium">Nobody in this list right now.</p>
-              <p className="text-sm mt-1">
-                {segment === 'winback'
-                  ? 'Everyone is coming back on schedule.'
-                  : 'Nothing needs chasing here today.'}
-              </p>
-            </CardContent>
-          </Card>
+          <EmptyState icon={Users} title="Nothing to action here" description={segment === 'winback' ? 'Everyone is coming back on schedule. That is what good retention looks like.' : 'This list is clear today. Check another growth opportunity above.'} />
         ) : (
           <>
             {remaining.length === 0 && (

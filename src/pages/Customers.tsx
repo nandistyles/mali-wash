@@ -14,6 +14,8 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Search, Share2, Award, History, Star, Car, Plus, TrendingUp, Users } from 'lucide-react';
 import type { Customer } from '../types';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -84,7 +86,10 @@ export default function Customers() {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row gap-6 h-full w-full p-6 bg-ink-50 overflow-hidden">
+    <div className="mali-page">
+      <div className="mali-page-inner max-w-[92rem] h-full flex flex-col">
+      <PageHeader eyebrow="One customer, one history" title="Customer 360" description="See every vehicle, visit, point, referral, and lifetime dollar in one shared Mali profile." />
+      <div className="flex flex-col lg:flex-row gap-5 flex-1 min-h-[36rem] overflow-hidden">
       <Card className="flex-1 flex flex-col h-full shrink-0 min-w-0">
         <div className="p-4 border-b border-ink-200">
           <div className="relative">
@@ -99,7 +104,7 @@ export default function Customers() {
         </div>
         <div className="flex-1 overflow-auto">
           {customers.length === 0 ? (
-            <div className="p-8 text-center text-ink-500">No customers found.</div>
+            <EmptyState compact icon={Users} title="No customers found" description="Try a different name, phone number, or vehicle registration." />
           ) : (
             <div className="divide-y divide-ink-100">
               {customers.map(customer => (
@@ -323,13 +328,10 @@ export default function Customers() {
           </Card>
         </div>
       ) : (
-        <div className="flex-1 hidden lg:flex items-center justify-center border-2 border-dashed border-ink-200 rounded-lg bg-ink-50">
-          <div className="text-center text-ink-400">
-            <Users className="w-10 h-10 mx-auto mb-2 opacity-50" />
-            <p className="font-medium">Select a customer</p>
-          </div>
-        </div>
+        <div className="flex-1 hidden lg:block"><EmptyState icon={Users} title="Choose a customer" description="Select a profile to see visits, vehicles, membership, referrals, and AutoPoints." /></div>
       )}
+      </div>
+      </div>
     </div>
   );
 }

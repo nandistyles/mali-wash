@@ -6,6 +6,7 @@ import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Trash2, Plus } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import PageHeader from '../components/PageHeader';
 
 export default function Settings() {
   const settings = useLiveQuery(() => db.settings.get('global'));
@@ -55,11 +56,9 @@ export default function Settings() {
   };
 
   return (
-    <div className="h-full w-full p-6 overflow-auto bg-ink-50 max-w-5xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink-900">Admin Settings</h1>
-        <p className="text-ink-500">Configure app rules and pricing</p>
-      </div>
+    <div className="mali-page">
+      <div className="mali-page-inner max-w-6xl">
+      <PageHeader eyebrow="Control centre" title="Wash settings" description="Keep pricing, services, and loyalty rules clear, editable, and consistent across every till." />
 
       <div className="grid gap-6 md:grid-cols-2 items-start">
         <Card>
@@ -144,6 +143,7 @@ export default function Settings() {
             <Button onClick={handleSaveServices} className="w-full bg-brand-900 hover:bg-brand-900 mt-4">Save Services</Button>
           </CardContent>
         </Card>
+      </div>
       </div>
     </div>
   );

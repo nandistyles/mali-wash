@@ -7,6 +7,8 @@ import { bookingConfirmationText, openWhatsApp } from '../lib/whatsapp';
 import { notifyLocalWrite } from '../lib/sync';
 import { Link } from 'react-router-dom';
 import { ArrowRight, MessageCircle } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
+import EmptyState from '../components/EmptyState';
 
 export default function Bookings() {
   const bookings = useLiveQuery(() => db.bookings.orderBy('requestedTime').reverse().toArray());
@@ -31,23 +33,17 @@ export default function Bookings() {
   };
 
   return (
-    <div className="h-full w-full p-6 overflow-auto bg-ink-50 max-w-5xl mx-auto space-y-6">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-2xl font-bold text-ink-900">Wash Bookings</h1>
-          <p className="text-ink-500">Manage online customer requests</p>
-        </div>
+    <div className="mali-page">
+      <div className="mali-page-inner max-w-6xl">
+      <PageHeader eyebrow="Customer experience" title="Wash bookings" description="Turn online interest into confirmed visits without losing the human touch." action={
         <Button variant="outline" asChild>
-          <a href="/book" target="_blank" rel="noopener noreferrer">View Public Form</a>
+          <a href="/book" target="_blank" rel="noopener noreferrer">View public page <ArrowRight className="w-4 h-4" /></a>
         </Button>
-      </div>
+      } />
 
       <div className="grid gap-4">
         {bookings?.length === 0 ? (
-          <div className="text-center p-12 bg-white rounded-lg border border-ink-200">
-            <Calendar className="w-12 h-12 text-ink-300 mx-auto mb-3" />
-            <p className="text-lg font-medium text-ink-600">No bookings yet</p>
-          </div>
+          <EmptyState icon={Calendar} title="The booking queue is clear" description="New requests from the public booking page will appear here, ready to confirm on WhatsApp." action={<Button variant="outline" asChild><a href="/book" target="_blank" rel="noopener noreferrer">Preview booking page</a></Button>} />
         ) : (
           bookings?.map(booking => (
             <Card key={booking.id} className={`border-l-4 ${
@@ -105,6 +101,7 @@ export default function Bookings() {
             </Card>
           ))
         )}
+      </div>
       </div>
     </div>
   );

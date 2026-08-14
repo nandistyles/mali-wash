@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { computeMetrics, dailyRevenue, type BusinessMetrics } from '../lib/growth';
 import { formatCurrency } from '../lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import PageHeader from '../components/PageHeader';
 import {
   DollarSign, Receipt, Users, Repeat, CreditCard, Star, TriangleAlert, Banknote, Smartphone
 } from 'lucide-react';
@@ -62,13 +63,9 @@ export default function Dashboard() {
     : 0;
 
   return (
-    <div className="h-full w-full overflow-auto bg-ink-50 p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl font-bold text-ink-900">Dashboard</h1>
-            <p className="text-ink-500">How the wash is actually doing.</p>
-          </div>
+    <div className="mali-page">
+      <div className="mali-page-inner max-w-[92rem]">
+        <PageHeader eyebrow="Business intelligence" title="Performance" description="The wash in numbers—revenue quality, customer behavior, payment mix, and loyalty exposure." action={
           <div className="flex gap-1 bg-white border-2 border-ink-200 rounded-lg p-1">
             {PERIODS.map(p => (
               <button
@@ -82,7 +79,7 @@ export default function Dashboard() {
               </button>
             ))}
           </div>
-        </div>
+        } />
 
         {!metrics ? (
           <Card><CardContent className="p-12 text-center text-ink-500">Reading the ledger…</CardContent></Card>

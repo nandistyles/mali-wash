@@ -1,15 +1,9 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
-
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Link, Navigate, Route, Routes } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
 import { lazy, Suspense, type ReactNode } from 'react';
 import { AuthProvider, useAuth } from './lib/auth';
+import BrandMark from './components/BrandMark';
 
-// Each screen is loaded only when it is opened. This keeps the public booking
-// form and the forecourt till from downloading charts and admin screens they do
-// not use, which matters on mobile data and makes cold starts much faster.
 const Layout = lazy(() => import('./components/Layout'));
 const POS = lazy(() => import('./pages/POS'));
 const Customers = lazy(() => import('./pages/Customers'));
@@ -23,41 +17,40 @@ const Login = lazy(() => import('./pages/Login'));
 
 function ScreenLoader() {
   return (
-    <div className="min-h-screen grid place-items-center bg-ink-50 text-brand-700 font-semibold">
-      Loading Mali Wash…
+    <div className="min-h-dvh grid place-items-center bg-ink-50">
+      <div className="flex flex-col items-center gap-5 animate-in-fade">
+        <BrandMark module="Wash" />
+        <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.15em] text-ink-400">
+          <span className="w-2 h-2 rounded-full bg-brand-500 animate-pulse" /> Preparing your workspace
+        </div>
+      </div>
     </div>
   );
 }
 
-/**
- * Route guard.
- *
- * The previous version treated "a Firebase user exists" as authorisation. It
- * isn't: the Firestore rules key every permission off a staff document, so a
- * signed-in account with no staff record would load the whole app and then fail
- * every read with a silent permission error. The guard now waits for the staff
- * record to resolve and sends the unresolved cases back to /login, which
- * explains what is wrong.
- */
+function NotFound() {
+  return (
+    <div className="min-h-dvh brand-gradient mali-grid text-white grid place-items-center p-5">
+      <div className="text-center max-w-lg animate-in-up">
+        <BrandMark inverse module="Holdings" className="justify-center mb-10" />
+        <p className="mali-eyebrow text-accent-300 justify-center">404 · Wrong turn</p>
+        <h1 className="brand-text-gradient text-5xl font-black tracking-[-0.05em] mt-4">This road ends here.</h1>
+        <p className="text-brand-100/65 mt-4">The page you’re looking for has moved or never existed.</p>
+        <Link to="/" className="inline-flex items-center gap-2 mt-8 bg-white text-brand-900 rounded-xl h-12 px-5 font-extrabold">
+          <ArrowLeft className="w-4 h-4" /> Back to Mali Wash
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function AuthGuard({ children }: { children: ReactNode }) {
   const { state } = useAuth();
-
-  if (state.status === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center text-brand-600">
-        Loading…
-      </div>
-    );
-  }
-
-  if (state.status !== 'ready') {
-    return <Navigate to="/login" replace />;
-  }
-
+  if (state.status === 'loading') return <ScreenLoader />;
+  if (state.status !== 'ready') return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
-/** Admin-only screens. Attendants must not be able to edit pricing. */
 function AdminOnly({ children }: { children: ReactNode }) {
   const { isAdmin } = useAuth();
   if (!isAdmin) return <Navigate to="/pos" replace />;
@@ -72,7 +65,6 @@ export default function App() {
           <Routes>
             <Route path="/book" element={<PublicBooking />} />
             <Route path="/login" element={<Login />} />
-
             <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
               <Route index element={<Navigate to="/pos" replace />} />
               <Route path="pos" element={<POS />} />
@@ -83,6 +75,7 @@ export default function App() {
               <Route path="bookings" element={<Bookings />} />
               <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
             </Route>
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </BrowserRouter>
