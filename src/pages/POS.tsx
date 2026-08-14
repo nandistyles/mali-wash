@@ -240,8 +240,8 @@ export default function POS() {
   if (!settings) return <div className="p-8 text-center text-ink-500">Loading settings…</div>;
 
   return (
-    <div className="flex flex-col lg:flex-row h-full w-full bg-background overflow-hidden">
-      <div className="flex-1 flex flex-col p-6 overflow-y-auto">
+    <div className="flex flex-col lg:flex-row h-full w-full bg-background overflow-y-auto lg:overflow-hidden">
+      <div className="flex-none lg:flex-1 flex flex-col p-4 sm:p-6 overflow-visible lg:overflow-y-auto">
 
         {/* A sale with no open shift cannot be reconciled, so it is blocked
             rather than silently attributed to a placeholder shift. */}
@@ -352,7 +352,7 @@ export default function POS() {
       </div>
 
       {/* Checkout */}
-      <aside className="w-full lg:w-[420px] bg-card border-l border-border flex flex-col shadow-[-8px_0_28px_rgba(13,18,18,0.04)] z-10 shrink-0">
+      <aside className="w-full lg:w-[420px] bg-card border-t lg:border-t-0 lg:border-l border-border flex flex-col shadow-[-8px_0_28px_rgba(13,18,18,0.04)] z-10 shrink-0 pb-20 lg:pb-0">
         <div className={`p-5 border-b transition-colors ${!selectedCustomer ? 'bg-ink-50 border-border' : 'bg-brand-50 border-brand-200'}`}>
           {!selectedCustomer ? (
             <div className="flex items-center gap-3">
