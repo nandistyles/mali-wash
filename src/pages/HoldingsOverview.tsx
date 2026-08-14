@@ -1,29 +1,45 @@
 import { Link } from 'react-router-dom';
-import { ArrowRight, CarFront, CircleGauge, PackageOpen, RadioTower, Sparkles, UsersRound } from 'lucide-react';
+import { ArrowUpRight, CarFront, ChevronRight, CircleGauge, PackageOpen, RadioTower, Search, Sparkles, UsersRound } from 'lucide-react';
 import PageHeader from '../components/PageHeader';
-import { Card, CardContent } from '../components/ui/card';
 
 const businesses = [
-  { id: 'wash', name: 'Mali Wash', line: 'Care & detailing', icon: CarFront, path: '/wash', tone: 'from-cyan-500 to-teal-700', status: 'Live' },
-  { id: 'parts', name: 'Mali Parts', line: 'Parts & trade supply', icon: PackageOpen, path: '/parts', tone: 'from-amber-400 to-orange-600', status: 'Ready' },
-  { id: 'drive', name: 'Mali Drive', line: 'Accessories & fitment', icon: CircleGauge, path: '/drive', tone: 'from-violet-500 to-indigo-700', status: 'Ready' },
-  { id: 'track', name: 'Mali Track', line: 'Tracking & fleet security', icon: RadioTower, path: '/track', tone: 'from-emerald-500 to-green-800', status: 'Ready' },
+  { name: 'Wash', detail: 'Care & detailing', icon: CarFront, path: '/wash', accent: 'bg-[#DFF7F3] text-[#08756D]', live: true },
+  { name: 'Parts', detail: 'Retail & trade supply', icon: PackageOpen, path: '/parts', accent: 'bg-[#FFF1D6] text-[#A9550B]', live: false },
+  { name: 'Drive', detail: 'Accessories & fitment', icon: CircleGauge, path: '/drive', accent: 'bg-[#EEE9FF] text-[#6046B5]', live: false },
+  { name: 'Track', detail: 'Security & fleet', icon: RadioTower, path: '/track', accent: 'bg-[#E4F5E8] text-[#287242]', live: false },
 ] as const;
 
 export default function HoldingsOverview() {
-  return (
-    <div className="mali-page"><div className="mali-page-inner max-w-[92rem]">
-      <PageHeader eyebrow="Mali Holdings command centre" title="One customer. Every road." description="Run the complete automotive relationship from one intelligent operating system—care, parts, accessories, tracking, loyalty, and growth." />
-      <section className="relative overflow-hidden rounded-[2rem] brand-gradient mali-grid p-6 sm:p-9 text-white shadow-xl">
-        <div className="absolute -right-16 -top-24 h-72 w-72 rounded-full bg-cyan-300/15 blur-3xl" />
-        <div className="relative max-w-3xl"><div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-[10px] font-extrabold uppercase tracking-[.16em] text-cyan-100"><Sparkles className="h-3.5 w-3.5 text-amber-300" /> Automotive relationship engine</div>
-          <h2 className="mt-5 text-3xl font-black tracking-[-.04em] sm:text-5xl">Grow the customer, not just the transaction.</h2>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-brand-100/75 sm:text-base">Every visit builds one Mali profile, one AutoPoints balance, and the next best reason for that customer to return.</p>
-          <div className="mt-7 flex flex-wrap gap-3"><Link to="/wash/pos" className="pressable inline-flex h-12 items-center gap-2 rounded-xl bg-white px-5 text-sm font-extrabold text-brand-950 shadow-lg">Open live POS <ArrowRight className="h-4 w-4" /></Link><Link to="/customers" className="pressable inline-flex h-12 items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-5 text-sm font-extrabold text-white"><UsersRound className="h-4 w-4" /> Find a customer</Link></div>
-        </div>
-      </section>
-      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">{businesses.map(unit => <Link key={unit.id} to={unit.path} className="group pressable block"><Card className="h-full overflow-hidden transition-all group-hover:-translate-y-1 group-hover:shadow-xl"><div className={`h-1.5 bg-gradient-to-r ${unit.tone}`} /><CardContent className="p-5"><div className="flex items-start justify-between"><div className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br ${unit.tone} text-white shadow-md`}><unit.icon className="h-6 w-6" /></div><span className="rounded-full bg-brand-50 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-brand-700">{unit.status}</span></div><h3 className="mt-5 text-xl font-black tracking-tight text-ink-950">{unit.name}</h3><p className="mt-1 text-sm text-ink-500">{unit.line}</p><span className="mt-5 inline-flex items-center gap-1.5 text-xs font-extrabold uppercase tracking-wider text-brand-700">Enter workspace <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" /></span></CardContent></Card></Link>)}</section>
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">{[['AutoPoints', 'One group-wide loyalty balance that gives every customer a reason to use the next Mali service.'], ['Customer 360', 'A single profile for vehicles, purchases, visits, subscriptions, referrals, and lifetime value.'], ['Next best action', 'Turn operational data into timely cross-sell opportunities instead of disconnected records.']].map(([title, body], index) => <Card key={title}><CardContent className="p-5"><span className="text-[10px] font-black uppercase tracking-[.18em] text-brand-600">0{index + 1} · Growth system</span><h3 className="mt-2 text-lg font-black text-ink-950">{title}</h3><p className="mt-2 text-sm leading-6 text-ink-500">{body}</p></CardContent></Card>)}</section>
-    </div></div>
-  );
+  return <div className="mali-page"><div className="mali-page-inner">
+    <PageHeader eyebrow="Group command centre" title="Good morning, Michael." description="A clear view of Mali Holdings—and the fastest route to the work that matters today." action={<Link to="/customers" className="inline-flex h-11 items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 text-sm font-bold text-ink-800 shadow-xs hover:border-brand-300"><Search className="h-4 w-4" /> Search customers</Link>} />
+
+    <section className="grid overflow-hidden rounded-[1.5rem] border border-brand-900/10 bg-[#063E3D] text-white shadow-xl lg:grid-cols-[1.35fr_.65fr]">
+      <div className="p-7 sm:p-10 lg:p-12">
+        <span className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[.16em] text-[#8ED8D0]"><Sparkles className="h-4 w-4" /> Customer relationship engine</span>
+        <h2 className="mt-5 max-w-2xl text-3xl font-black leading-[1.05] tracking-[-.045em] sm:text-5xl">One customer.<br/>Every automotive need.</h2>
+        <p className="mt-5 max-w-xl text-sm leading-7 text-white/65 sm:text-base">Wash, parts, accessories and tracking share one customer history, one transaction ledger and one AutoPoints balance.</p>
+        <div className="mt-8 flex flex-wrap gap-3"><Link to="/wash/pos" className="inline-flex h-12 items-center gap-2 rounded-xl bg-[#F8C454] px-5 text-sm font-extrabold text-[#302307] shadow-lg hover:bg-[#FFD271]">Start a wash sale <ArrowUpRight className="h-4 w-4" /></Link><Link to="/customers" className="inline-flex h-12 items-center gap-2 rounded-xl border border-white/15 bg-white/8 px-5 text-sm font-bold text-white hover:bg-white/12"><UsersRound className="h-4 w-4" /> Customer 360</Link></div>
+      </div>
+      <div className="hidden border-l border-white/10 bg-white/[.04] p-8 lg:flex lg:flex-col lg:justify-between">
+        <p className="text-xs font-bold uppercase tracking-[.15em] text-white/45">Today’s focus</p>
+        <div><p className="text-5xl font-black tracking-[-.06em]">4</p><p className="mt-2 text-sm leading-6 text-white/60">connected businesses building one Mali customer relationship.</p></div>
+        <Link to="/growth" className="inline-flex items-center justify-between border-t border-white/10 pt-5 text-sm font-bold">Open growth engine <ChevronRight className="h-4 w-4" /></Link>
+      </div>
+    </section>
+
+    <section>
+      <div className="mb-5 flex items-end justify-between"><div><p className="text-[11px] font-extrabold uppercase tracking-[.14em] text-brand-700">Operations</p><h2 className="mt-2 text-2xl font-black tracking-tight text-ink-950">Choose a business</h2></div><p className="hidden text-sm text-ink-500 sm:block">One login across Mali Holdings</p></div>
+      <div className="grid overflow-hidden rounded-[1.5rem] border border-ink-200 bg-white shadow-sm sm:grid-cols-2 xl:grid-cols-4">
+        {businesses.map((unit, index) => <Link key={unit.name} to={unit.path} className={`group min-h-52 p-6 sm:p-7 hover:bg-ink-50/70 ${index ? 'border-t sm:border-t-0 sm:border-l border-ink-200' : ''} ${index === 2 ? 'sm:border-l-0 sm:border-t xl:border-l xl:border-t-0' : ''}`}>
+          <div className="flex items-start justify-between"><span className={`grid h-12 w-12 place-items-center rounded-2xl ${unit.accent}`}><unit.icon className="h-5 w-5" /></span>{unit.live && <span className="rounded-full bg-brand-50 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wider text-brand-700">Live</span>}</div>
+          <h3 className="mt-7 text-xl font-black text-ink-950">Mali {unit.name}</h3><p className="mt-1.5 text-sm text-ink-500">{unit.detail}</p><span className="mt-6 inline-flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-ink-700">Open workspace <ChevronRight className="h-4 w-4 transition-transform group-hover:translate-x-1" /></span>
+        </Link>)}
+      </div>
+    </section>
+
+    <section className="grid gap-5 lg:grid-cols-[1.25fr_.75fr]">
+      <div className="rounded-[1.5rem] border border-ink-200 bg-white p-7 sm:p-8"><p className="text-[11px] font-extrabold uppercase tracking-[.14em] text-brand-700">How Mali grows</p><h2 className="mt-3 text-2xl font-black text-ink-950">The relationship compounds.</h2><div className="mt-7 grid gap-6 sm:grid-cols-3">{[['01', 'Recognise', 'Find the customer by phone or vehicle.'], ['02', 'Serve', 'Complete the job and capture the transaction.'], ['03', 'Bring back', 'Reward loyalty and offer the next useful service.']].map(([n,t,d]) => <div key={n}><span className="font-mono text-xs font-bold text-brand-600">{n}</span><h3 className="mt-3 font-extrabold text-ink-950">{t}</h3><p className="mt-2 text-sm leading-6 text-ink-500">{d}</p></div>)}</div></div>
+      <Link to="/growth" className="group flex min-h-64 flex-col justify-between rounded-[1.5rem] bg-[#F3E5BD] p-7 text-[#302307] sm:p-8"><div><p className="text-[11px] font-extrabold uppercase tracking-[.14em] opacity-60">Growth engine</p><h2 className="mt-3 text-2xl font-black">Turn every visit into the next one.</h2></div><span className="inline-flex items-center justify-between border-t border-black/10 pt-5 text-sm font-extrabold">See opportunities <ArrowUpRight className="h-5 w-5 transition-transform group-hover:-translate-y-1 group-hover:translate-x-1" /></span></Link>
+    </section>
+  </div></div>;
 }
