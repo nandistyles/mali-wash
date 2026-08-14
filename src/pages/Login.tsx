@@ -15,7 +15,7 @@ export default function Login() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (state.status === 'ready') navigate('/pos', { replace: true });
+    if (state.status === 'ready') navigate('/', { replace: true });
   }, [state.status, navigate]);
 
   const handleSubmit = async (event: FormEvent) => {
@@ -48,7 +48,7 @@ export default function Login() {
     return (
       <div className="min-h-dvh bg-ink-50 grid place-items-center p-5">
         <div className="w-full max-w-lg mali-glass rounded-[1.75rem] p-7 sm:p-9">
-          <BrandMark module="Wash" />
+          <BrandMark module="Holdings" />
           <div className="w-14 h-14 rounded-2xl bg-accent-100 text-accent-700 grid place-items-center mt-8 mb-5">
             <TriangleAlert className="w-6 h-6" />
           </div>
@@ -73,7 +73,7 @@ export default function Login() {
       <section className="hidden lg:flex brand-gradient mali-grid relative overflow-hidden p-12 xl:p-16 text-white flex-col justify-between">
         <div className="absolute -top-40 -right-40 w-[34rem] h-[34rem] rounded-full bg-brand-400/25 blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-[32rem] h-[32rem] rounded-full bg-accent-300/10 blur-3xl" />
-        <BrandMark inverse module="Wash" className="relative" />
+        <BrandMark inverse module="Holdings" className="relative" />
 
         <div className="relative max-w-xl py-12">
           <p className="mali-eyebrow text-accent-300 mb-5"><ShieldCheck className="w-4 h-4" /> Mali automotive platform</p>
@@ -81,7 +81,7 @@ export default function Login() {
             Every customer.<br />Every visit.<br />Remembered.
           </h1>
           <p className="mt-7 text-lg leading-relaxed text-brand-100/75 max-w-lg">
-            The shared operating system behind Mali Wash today—and every Mali automotive business tomorrow.
+            One operating system for every Mali automotive business—and every customer relationship.
           </p>
           <div className="grid grid-cols-3 gap-3 mt-10">
             {[
@@ -103,10 +103,10 @@ export default function Login() {
 
       <main className="relative grid place-items-center p-5 sm:p-10 bg-[radial-gradient(circle_at_70%_10%,#d7f2ef_0%,transparent_32rem)]">
         <div className="w-full max-w-md animate-in-up">
-          <div className="lg:hidden mb-10"><BrandMark module="Wash" /></div>
+          <div className="lg:hidden mb-10"><BrandMark module="Holdings" /></div>
           <p className="mali-eyebrow mb-3">Staff access</p>
           <h2 className="mali-title">Welcome back.</h2>
-          <p className="mali-subtitle mt-2">Sign in to open the till and start serving customers.</p>
+          <p className="mali-subtitle mt-2">Sign in once to access every business you operate.</p>
 
           <form onSubmit={handleSubmit} className="mt-8 space-y-5">
             {error && <div role="alert" className="rounded-xl bg-red-50 border border-red-200 p-3.5 text-sm text-red-800 flex gap-2.5"><TriangleAlert className="w-4 h-4 mt-0.5 shrink-0" />{error}</div>}
@@ -122,7 +122,7 @@ export default function Login() {
             </div>
             <Button type="submit" size="lg" className="w-full group" disabled={busy}>
               <LogIn className="w-5 h-5" />
-              {busy ? 'Signing in…' : 'Enter Mali Wash'}
+              {busy ? 'Signing in…' : 'Enter Mali Holdings'}
               {!busy && <ArrowRight className="w-4 h-4 ml-auto transition-transform group-hover:translate-x-0.5" />}
             </Button>
             <div className="flex items-center justify-center gap-2 text-xs text-ink-400"><WifiOff className="w-3.5 h-3.5" /> Your session stays available through network outages.</div>
