@@ -2,7 +2,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useSync } from '../lib/sync';
 import { useAuth } from '../lib/auth';
 import {
-  CalendarDays, CarFront, Clock3, LayoutDashboard, LogOut,
+  CalendarDays, CarFront, Clock3, LayoutDashboard, LogOut, Building2, PackageOpen, CircleGauge, RadioTower,
   RefreshCw, Settings, Sparkles, TriangleAlert, TrendingUp, UsersRound
 } from 'lucide-react';
 import BrandMark from './BrandMark';
@@ -20,7 +20,11 @@ export default function Layout() {
   };
 
   const navItems = [
-    { path: '/pos', label: 'Wash', icon: CarFront },
+    { path: '/', label: 'Holdings', icon: Building2, exact: true },
+    { path: '/wash', label: 'Wash', icon: CarFront },
+    { path: '/parts', label: 'Parts', icon: PackageOpen },
+    { path: '/drive', label: 'Drive', icon: CircleGauge },
+    { path: '/track', label: 'Track', icon: RadioTower },
     { path: '/customers', label: 'Customers', icon: UsersRound },
     { path: '/shifts', label: 'Shifts', icon: Clock3 },
     { path: '/bookings', label: 'Bookings', icon: CalendarDays },
@@ -51,7 +55,7 @@ export default function Layout() {
       <aside className="hidden md:flex w-[232px] brand-gradient mali-grid text-white flex-col shrink-0 relative overflow-hidden">
         <div className="absolute -top-24 -right-24 w-56 h-56 rounded-full bg-brand-400/20 blur-3xl" />
         <div className="p-5 relative">
-          <BrandMark inverse module="Wash" />
+          <BrandMark inverse module="Holdings" />
           <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/8 px-3 py-1.5 text-[10px] font-bold uppercase tracking-[0.13em] text-brand-100">
             <Sparkles className="w-3 h-3 text-accent-300" /> Ruwa Experience Hub
           </div>
@@ -59,7 +63,7 @@ export default function Layout() {
 
         <nav className="relative flex-1 px-3 py-2 space-y-1 overflow-y-auto" aria-label="Main navigation">
           {navItems.map(item => {
-            const active = location.pathname.startsWith(item.path);
+            const active = item.exact ? location.pathname === item.path : location.pathname.startsWith(item.path);
             return (
               <Link key={item.path} to={item.path} aria-current={active ? 'page' : undefined}
                 className={`pressable group flex items-center gap-3 h-12 px-3.5 rounded-xl font-bold text-sm transition-colors ${
@@ -133,7 +137,7 @@ export default function Layout() {
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 border-t border-border backdrop-blur-xl px-1 pb-[env(safe-area-inset-bottom)]" aria-label="Mobile navigation">
           <div className="h-[70px] flex items-stretch justify-around overflow-x-auto">
             {navItems.map(item => {
-              const active = location.pathname.startsWith(item.path);
+              const active = item.exact ? location.pathname === item.path : location.pathname.startsWith(item.path);
               return (
                 <Link key={item.path} to={item.path} aria-current={active ? 'page' : undefined}
                   className={`pressable min-w-[64px] flex flex-col items-center justify-center gap-1 text-[9px] font-extrabold uppercase tracking-wide ${active ? 'text-brand-800' : 'text-ink-400'}`}>

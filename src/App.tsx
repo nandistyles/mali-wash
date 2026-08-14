@@ -14,12 +14,14 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Bookings = lazy(() => import('./pages/Bookings'));
 const PublicBooking = lazy(() => import('./pages/PublicBooking'));
 const Login = lazy(() => import('./pages/Login'));
+const HoldingsOverview = lazy(() => import('./pages/HoldingsOverview'));
+const BusinessWorkspace = lazy(() => import('./pages/BusinessWorkspace'));
 
 function ScreenLoader() {
   return (
     <div className="min-h-dvh grid place-items-center bg-ink-50">
       <div className="flex flex-col items-center gap-5 animate-in-fade">
-        <BrandMark module="Wash" />
+        <BrandMark module="Holdings" />
         <div className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.15em] text-ink-400">
           <span className="w-2 h-2 rounded-full bg-brand-500 animate-pulse" /> Preparing your workspace
         </div>
@@ -66,7 +68,9 @@ export default function App() {
             <Route path="/book" element={<PublicBooking />} />
             <Route path="/login" element={<Login />} />
             <Route path="/" element={<AuthGuard><Layout /></AuthGuard>}>
-              <Route index element={<Navigate to="/pos" replace />} />
+              <Route index element={<HoldingsOverview />} />
+              <Route path=":business" element={<BusinessWorkspace />} />
+              <Route path="wash/pos" element={<POS />} />
               <Route path="pos" element={<POS />} />
               <Route path="customers" element={<Customers />} />
               <Route path="shifts" element={<Shifts />} />
