@@ -39,6 +39,16 @@ service cloud.firestore {
       return isStaff() && staffDoc().role == 'admin';
     }
 
+    function staffCanOperate(uid, business) {
+      return exists(/databases/$(database)/documents/staff/$(uid))
+        && get(/databases/$(database)/documents/staff/$(uid)).data.active == true
+        && (business in get(/databases/$(database)/documents/staff/$(uid)).data.businesses);
+    }
+
+    function isSupervisor() {
+      return isStaff() && staffDoc().role in ['supervisor', 'admin'];
+    }
+
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -79,7 +89,7 @@ service cloud.firestore {
         && data.business in ['wash', 'parts', 'drive', 'track']
         && (!('customerId' in data) || data.customerId == null || data.customerId is string)
         && (!('customerPhone' in data) || data.customerPhone == null || data.customerPhone is string)
-        && data.lineItems is list
+        && data.lineItems is list && data.lineItems.size() > 0 && data.lineItems.size() <= 50
         && data.amount is number && data.amount >= 0
         && data.paymentMethod in ['cash_usd', 'ecocash', 'card']
         && data.pointsEarned is number && data.pointsEarned >= 0
@@ -97,8 +107,12 @@ service cloud.firestore {
         && data.customerId is string
         && data.business in ['wash', 'parts', 'drive', 'track']
         && data.type in ['earn', 'redeem', 'referral_reward', 'adjustment']
-        && data.points is number
-        && (!('transactionId' in data) || data.transactionId == null || data.transactionId is string)
+        && data.points is number && data.points != 0
+        && ((data.type in ['earn', 'referral_reward'] && data.points > 0)
+          || (data.type == 'redeem' && data.points < 0)
+          || (data.type == 'adjustment' && isSupervisor()))
+        && ((data.type == 'adjustment' && (!('transactionId' in data) || data.transactionId == null || data.transactionId is string))
+          || (data.transactionId is string && data.transactionId.size() > 0))
         && data.reason is string && data.reason.size() <= 255
         && data.createdAt is number;
     }
@@ -134,7 +148,7 @@ service cloud.firestore {
         && data.referrerId is string
         && data.refereeId is string
         && data.business in ['wash', 'parts', 'drive', 'track']
-        && data.rewardPoints is number
+        && data.rewardPoints is number && data.rewardPoints > 0
         && data.createdAt is number;
     }
 
@@ -151,11 +165,15 @@ service cloud.firestore {
     }
 
     function isValidSettings(data) {
-      return data.keys().hasAll(['id', 'pointsPerWash', 'referralRewardPoints', 'services'])
+      return data.keys().hasAll(['id', 'pointsPerWash', 'referralRewardPoints', 'services', 'membershipPlans', 'pointsPerDollar', 'redemptionRate', 'minRedeemablePoints'])
         && data.id is string
         && data.services is list
-        && data.pointsPerWash is number
-        && data.referralRewardPoints is number;
+        && data.membershipPlans is list
+        && data.pointsPerWash is number && data.pointsPerWash >= 0
+        && data.pointsPerDollar is number && data.pointsPerDollar >= 0
+        && data.referralRewardPoints is number && data.referralRewardPoints >= 0
+        && data.redemptionRate is number && data.redemptionRate > 0
+        && data.minRedeemablePoints is number && data.minRedeemablePoints >= 0;
     }
 
     // ---------------------------------------------------------------------
@@ -174,9 +192,11 @@ service cloud.firestore {
     match /transactions/{transactionId} {
       allow get, list: if isStaff();
       // You may only book money against a business you are assigned to.
-      allow create: if canOperate(incoming().business) && isValidId(transactionId) && isValidTransaction(incoming());
+      allow create: if canOperate(incoming().business) && isValidId(transactionId)
+        && staffCanOperate(incoming().staffId, incoming().business)
+        && incoming().status == 'completed' && isValidTransaction(incoming());
       // Voiding only — a completed sale is never silently rewritten.
-      allow update: if canOperate(existing().business)
+      allow update: if canOperate(existing().business) && isSupervisor()
         && isValidId(transactionId)
         && isValidTransaction(incoming())
         && existing().status == 'completed'
@@ -198,7 +218,9 @@ service cloud.firestore {
 
     match /referralRedemptions/{redemptionId} {
       allow get, list: if isStaff();
-      allow create: if canOperate(incoming().business) && isValidId(redemptionId) && isValidReferralRedemption(incoming());
+      allow create: if canOperate(incoming().business)
+        && redemptionId == 'referral_' + incoming().refereeId
+        && isValidId(redemptionId) && isValidReferralRedemption(incoming());
       allow update: if false;
       allow delete: if isAdmin() && isValidId(redemptionId);
     }
@@ -239,6 +261,28 @@ service cloud.firestore {
       allow delete: if isAdmin() && isValidId(shiftId);
     }
 
+    match /cashSessions/{sessionId} {
+      allow get, list: if isStaff();
+      allow create: if isValidId(sessionId)
+        && incoming().id == sessionId
+        && incoming().business in ['parts', 'drive', 'track']
+        && canOperate(incoming().business)
+        && staffCanOperate(incoming().staffId, incoming().business)
+        && incoming().openedAt is number
+        && incoming().openingFloat is number && incoming().openingFloat >= 0
+        && incoming().status in ['open', 'closed'];
+      allow update: if canOperate(existing().business)
+        && incoming().business == existing().business
+        && incoming().staffId == existing().staffId
+        && incoming().openedAt == existing().openedAt
+        && incoming().openingFloat == existing().openingFloat
+        && existing().status == 'open' && incoming().status == 'closed'
+        && incoming().closedAt is number
+        && incoming().countedCash is number && incoming().countedCash >= 0
+        && incoming().variance is number;
+      allow delete: if isAdmin();
+    }
+
     match /bookings/{bookingId} {
       allow get, list: if canOperate('wash');
       // The public booking form at /book is unauthenticated by design, so this
@@ -272,10 +316,31 @@ service cloud.firestore {
         && incoming().business in ['parts', 'drive']
         && canOperate(incoming().business)
         && incoming().id == itemId
-        && incoming().name is string && incoming().sku is string
-        && incoming().stockQty is number && incoming().sellPrice is number
+        && incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 150
+        && incoming().sku is string && incoming().sku.size() > 0 && incoming().sku.size() <= 50
+        && incoming().category is string && incoming().category.size() <= 100
+        && incoming().stockQty is number && incoming().stockQty >= 0
+        && incoming().sellPrice is number && incoming().sellPrice >= 0
+        && incoming().costPrice is number && incoming().costPrice >= 0
+        && incoming().reorderLevel is number && incoming().reorderLevel >= 0
+        && incoming().active is bool
         && incoming().updatedAt is number;
       allow delete: if isAdmin();
+    }
+
+    match /inventoryMovements/{movementId} {
+      allow get, list: if isStaff();
+      allow create: if isValidId(movementId)
+        && incoming().id == movementId
+        && incoming().business in ['parts', 'drive']
+        && canOperate(incoming().business)
+        && incoming().itemId is string
+        && incoming().type in ['sale', 'receive', 'adjustment', 'return', 'void']
+        && incoming().qtyDelta is number && incoming().qtyDelta != 0
+        && incoming().reason is string && incoming().reason.size() > 0 && incoming().reason.size() <= 255
+        && staffCanOperate(incoming().staffId, incoming().business)
+        && incoming().createdAt is number;
+      allow update, delete: if false;
     }
 
     match /fitmentJobs/{jobId} {
@@ -283,6 +348,11 @@ service cloud.firestore {
       allow create, update: if canOperate('drive') && isValidId(jobId)
         && incoming().id == jobId
         && incoming().status in ['booked', 'in_progress', 'completed', 'cancelled']
+        && incoming().customerName is string && incoming().customerName.size() <= 100
+        && incoming().phone is string && incoming().phone.size() <= 20
+        && incoming().vehicleReg is string && incoming().vehicleReg.size() > 0 && incoming().vehicleReg.size() <= 30
+        && incoming().description is string && incoming().description.size() > 0 && incoming().description.size() <= 255
+        && incoming().quotedAmount is number && incoming().quotedAmount >= 0
         && incoming().scheduledAt is number && incoming().updatedAt is number;
       allow delete: if isAdmin();
     }
@@ -292,7 +362,9 @@ service cloud.firestore {
       allow create, update: if canOperate('track') && isValidId(deviceId)
         && incoming().id == deviceId
         && incoming().status in ['in_stock', 'assigned', 'installed', 'faulty']
-        && incoming().serialNumber is string && incoming().imei is string
+        && incoming().serialNumber is string && incoming().serialNumber.size() > 0 && incoming().serialNumber.size() <= 80
+        && incoming().imei is string && incoming().imei.matches('^[0-9]{14,16}$')
+        && incoming().model is string && incoming().model.size() > 0 && incoming().model.size() <= 100
         && incoming().updatedAt is number;
       allow delete: if isAdmin();
     }
@@ -302,7 +374,11 @@ service cloud.firestore {
       allow create, update: if canOperate('track') && isValidId(subscriptionId)
         && incoming().id == subscriptionId
         && incoming().status in ['active', 'past_due', 'suspended', 'cancelled']
-        && incoming().monthlyFee is number && incoming().renewalAt is number
+        && incoming().customerId is string && incoming().deviceId is string
+        && incoming().vehicleReg is string && incoming().vehicleReg.size() > 0
+        && incoming().planName is string && incoming().planName.size() > 0
+        && incoming().monthlyFee is number && incoming().monthlyFee > 0
+        && incoming().startedAt is number && incoming().renewalAt is number
         && incoming().updatedAt is number;
       allow delete: if isAdmin();
     }

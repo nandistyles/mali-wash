@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Customer, WashMembership, Transaction, PointsLedgerEntry, Staff, Shift, ReferralRedemption, Booking, Settings, InventoryItem, FitmentJob, TrackingDevice, TrackingSubscription } from '../types';
+import type { Customer, WashMembership, Transaction, PointsLedgerEntry, Staff, Shift, CashSession, ReferralRedemption, Booking, Settings, InventoryItem, InventoryMovement, FitmentJob, TrackingDevice, TrackingSubscription } from '../types';
 
 export const DEFAULT_SETTINGS: Settings = {
   id: 'global',
@@ -43,10 +43,12 @@ export class MaliWashDB extends Dexie {
   pointsLedger!: Table<PointsLedgerEntry, string>;
   staff!: Table<Staff, string>;
   shifts!: Table<Shift, string>;
+  cashSessions!: Table<CashSession, string>;
   referralRedemptions!: Table<ReferralRedemption, string>;
   bookings!: Table<Booking, string>;
   settings!: Table<Settings, string>;
   inventoryItems!: Table<InventoryItem, string>;
+  inventoryMovements!: Table<InventoryMovement, string>;
   fitmentJobs!: Table<FitmentJob, string>;
   trackingDevices!: Table<TrackingDevice, string>;
   trackingSubscriptions!: Table<TrackingSubscription, string>;
@@ -98,6 +100,16 @@ export class MaliWashDB extends Dexie {
       fitmentJobs: 'id, customerId, status, scheduledAt, updatedAt, syncStatus',
       trackingDevices: 'id, serialNumber, imei, status, customerId, updatedAt, syncStatus',
       trackingSubscriptions: 'id, customerId, deviceId, status, renewalAt, updatedAt, syncStatus'
+    });
+
+    // v6: every stock change gets an auditable movement row. Totals remain
+    // cached on InventoryItem for fast offline screens, as points balances do.
+    this.version(6).stores({
+      inventoryMovements: 'id, itemId, business, type, transactionId, createdAt, syncStatus'
+    });
+
+    this.version(7).stores({
+      cashSessions: 'id, business, staffId, status, openedAt, syncStatus'
     });
   }
 }

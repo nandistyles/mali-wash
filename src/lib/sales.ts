@@ -267,7 +267,9 @@ export async function commitSale(input: CommitSaleInput): Promise<CommitSaleResu
 export async function voidTransaction(transactionId: string, reason: string): Promise<void> {
   await db.transaction(
     'rw',
-    [db.transactions, db.customers, db.pointsLedger, db.settings],
+    [db.transactions, db.customers, db.pointsLedger, db.settings, db.inventoryItems,
+      db.inventoryMovements, db.fitmentJobs, db.trackingSubscriptions,
+      db.trackingDevices, db.washMemberships],
     async () => {
       const txn = await db.transactions.get(transactionId);
       if (!txn) throw new Error('Transaction not found');
@@ -290,9 +292,77 @@ export async function voidTransaction(transactionId: string, reason: string): Pr
         }
       }
 
+      const now = Date.now();
+
+      // Reverse the operational side of the sale in the same local commit as
+      // the financial void. A void must never leave stock, jobs or devices in a
+      // state that still claims the original sale happened.
+      const inventoryItemId = txn.businessMeta.inventoryItemId as string | undefined;
+      const inventoryQty = Number(txn.businessMeta.inventoryQty ?? 0);
+      if (inventoryItemId && inventoryQty > 0) {
+        const item = await db.inventoryItems.get(inventoryItemId);
+        if (item) {
+          await db.inventoryItems.update(item.id, {
+            stockQty: item.stockQty + inventoryQty,
+            updatedAt: now,
+            syncStatus: 'pending_sync'
+          });
+          await db.inventoryMovements.put({
+            id: `movement_void_${transactionId}_${item.id}`,
+            itemId: item.id,
+            business: item.business,
+            type: 'void',
+            qtyDelta: inventoryQty,
+            reason: `Voided sale: ${reason}`,
+            staffId: txn.staffId,
+            transactionId,
+            createdAt: now,
+            syncStatus: 'pending_sync'
+          });
+        }
+      }
+
+      const fitmentJobId = txn.businessMeta.fitmentJobId as string | undefined;
+      if (fitmentJobId) {
+        await db.fitmentJobs.update(fitmentJobId, {
+          status: 'in_progress', sourceTransactionId: null,
+          updatedAt: now, syncStatus: 'pending_sync'
+        });
+      }
+
+      const subscriptionId = txn.businessMeta.subscriptionId as string | undefined;
+      if (subscriptionId) {
+        const subscription = await db.trackingSubscriptions.get(subscriptionId);
+        if (subscription?.lastTransactionId === transactionId) {
+          const isFirstPayment = subscription.startedAt === subscription.lastPaymentAt;
+          await db.trackingSubscriptions.update(subscription.id, {
+            status: isFirstPayment ? 'cancelled' : 'past_due',
+            renewalAt: Math.min(subscription.renewalAt, now),
+            lastTransactionId: null,
+            updatedAt: now,
+            syncStatus: 'pending_sync'
+          });
+          if (isFirstPayment) {
+            await db.trackingDevices.update(subscription.deviceId, {
+              status: 'in_stock', customerId: null, vehicleReg: null,
+              updatedAt: now, syncStatus: 'pending_sync'
+            });
+          }
+        }
+      }
+
+      const grantedMemberships = await db.washMemberships
+        .filter(membership => membership.sourceTransactionId === transactionId).toArray();
+      for (const membership of grantedMemberships) {
+        await db.washMemberships.update(membership.id, {
+          expiry: now,
+          syncStatus: 'pending_sync'
+        });
+      }
+
       await db.transactions.update(transactionId, {
         status: 'voided',
-        businessMeta: { ...txn.businessMeta, voidReason: reason, voidedAt: Date.now() },
+        businessMeta: { ...txn.businessMeta, voidReason: reason, voidedAt: now },
         syncStatus: 'pending_sync'
       });
     }

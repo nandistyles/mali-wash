@@ -20,11 +20,11 @@ import { normalisePhone } from './phone';
  * stops being reasonable.
  */
 
-const CLOUD_API_TOKEN = import.meta.env.VITE_WHATSAPP_API_TOKEN;
-const CLOUD_API_PHONE_ID = import.meta.env.VITE_WHATSAPP_PHONE_NUMBER_ID;
 const CLOUD_API_PROXY = import.meta.env.VITE_WHATSAPP_PROXY_URL;
 
-export const isCloudApiConfigured = Boolean(CLOUD_API_TOKEN && CLOUD_API_PHONE_ID && CLOUD_API_PROXY);
+// Secrets never belong in a Vite variable: every VITE_* value is readable in
+// the browser bundle. The proxy owns the Cloud API token and phone-number id.
+export const isCloudApiConfigured = Boolean(CLOUD_API_PROXY);
 
 /**
  * Build a wa.me link. Returns null for an unusable number rather than opening

@@ -121,6 +121,19 @@ export interface Shift {
   syncStatus?: SyncStatus;
 }
 
+export interface CashSession {
+  id: string;
+  business: Exclude<BusinessUnit, "wash">;
+  staffId: string;
+  openedAt: number;
+  closedAt?: number | null;
+  openingFloat: number;
+  countedCash?: number | null;
+  variance?: number | null;
+  status: ShiftStatus;
+  syncStatus?: SyncStatus;
+}
+
 export interface Booking {
   id: string;
   name: string;
@@ -161,6 +174,19 @@ export interface InventoryItem {
   syncStatus?: SyncStatus;
 }
 
+export interface InventoryMovement {
+  id: string;
+  itemId: string;
+  business: "parts" | "drive";
+  type: "sale" | "receive" | "adjustment" | "return" | "void";
+  qtyDelta: number;
+  reason: string;
+  staffId: string;
+  transactionId?: string | null;
+  createdAt: number;
+  syncStatus?: SyncStatus;
+}
+
 export interface FitmentJob {
   id: string;
   customerId?: string | null;
@@ -171,6 +197,7 @@ export interface FitmentJob {
   scheduledAt: number;
   status: "booked" | "in_progress" | "completed" | "cancelled";
   quotedAmount: number;
+  sourceTransactionId?: string | null;
   createdAt: number;
   updatedAt: number;
   syncStatus?: SyncStatus;
@@ -198,6 +225,8 @@ export interface TrackingSubscription {
   status: "active" | "past_due" | "suspended" | "cancelled";
   startedAt: number;
   renewalAt: number;
+  lastPaymentAt?: number | null;
+  lastTransactionId?: string | null;
   updatedAt: number;
   syncStatus?: SyncStatus;
 }

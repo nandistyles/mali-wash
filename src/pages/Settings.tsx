@@ -1,150 +1,92 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../lib/db';
+import { v4 as uuidv4 } from 'uuid';
+import { AlertTriangle, CheckCircle2, Plus, Save, Trash2 } from 'lucide-react';
+import { db, DEFAULT_SETTINGS } from '../lib/db';
+import { notifyLocalWrite } from '../lib/sync';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
-import { Trash2, Plus } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
 import PageHeader from '../components/PageHeader';
+import type { MembershipPlan, Settings as SettingsRecord, WashService } from '../types';
 
 export default function Settings() {
-  const settings = useLiveQuery(() => db.settings.get('global'));
-  
-  const [pointsPerWash, setPointsPerWash] = useState('5');
-  const [referralPoints, setReferralPoints] = useState('50');
-  
-  const [services, setServices] = useState<{id: string, name: string, price: number, type: "wash" | "membership" | "fleet"}[]>([]);
+  const stored = useLiveQuery(() => db.settings.get('global'));
+  const [draft, setDraft] = useState<SettingsRecord>(DEFAULT_SETTINGS);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    if (settings) {
-      setPointsPerWash(settings.pointsPerWash.toString());
-      setReferralPoints(settings.referralRewardPoints.toString());
-      setServices(settings.services || []);
+  useEffect(() => { if (stored) setDraft({ ...DEFAULT_SETTINGS, ...stored }); }, [stored]);
+
+  function numeric(field: keyof Pick<SettingsRecord, 'pointsPerDollar'|'pointsPerWash'|'referralRewardPoints'|'redemptionRate'|'minRedeemablePoints'>, value: string) {
+    setDraft(current => ({ ...current, [field]: Number(value) }));
+  }
+
+  function updateService(index: number, patch: Partial<WashService>) {
+    setDraft(current => {
+      const service = current.services[index];
+      const services = current.services.map((row, rowIndex) => rowIndex === index ? { ...row, ...patch } : row);
+      let membershipPlans = current.membershipPlans;
+      if (patch.type === 'membership' && !membershipPlans.some(plan => plan.id === service.id)) {
+        membershipPlans = [...membershipPlans, { id: service.id, tier: 'basic_member', durationDays: 30, coveredServiceIds: [], washesPerPeriod: 8 }];
+      }
+      if (patch.type && patch.type !== 'membership') {
+        membershipPlans = membershipPlans.filter(plan => plan.id !== service.id);
+      }
+      return { ...current, services, membershipPlans };
+    });
+  }
+
+  function addService() {
+    setDraft(current => ({ ...current, services: [...current.services, { id: `service_${uuidv4().slice(0,8)}`, name: 'New service', price: 0, type: 'wash' }] }));
+  }
+
+  function removeService(index: number) {
+    const service = draft.services[index];
+    if (draft.membershipPlans.some(plan => plan.id === service.id || plan.coveredServiceIds.includes(service.id))) {
+      setError('This service belongs to a membership plan. Update or remove that plan first.');
+      return;
     }
-  }, [settings]);
+    setDraft(current => ({ ...current, services: current.services.filter((_, row) => row !== index) }));
+  }
 
-  const handleSavePoints = async () => {
-    await db.settings.update('global', {
-      pointsPerWash: parseInt(pointsPerWash, 10),
-      referralRewardPoints: parseInt(referralPoints, 10),
-      syncStatus: 'pending_sync'
-    });
-    alert('Loyalty Rules saved!');
-  };
+  function updatePlan(index: number, patch: Partial<MembershipPlan>) {
+    setDraft(current => ({ ...current, membershipPlans: current.membershipPlans.map((plan, row) => row === index ? { ...plan, ...patch } : plan) }));
+  }
 
-  const handleSaveServices = async () => {
-    await db.settings.update('global', {
-      services,
-      syncStatus: 'pending_sync'
-    });
-    alert('Services saved!');
-  };
+  async function save() {
+    setError(''); setMessage('');
+    try {
+      const numericValues = [draft.pointsPerDollar, draft.pointsPerWash, draft.referralRewardPoints, draft.minRedeemablePoints];
+      if (numericValues.some(value => !Number.isFinite(value) || value < 0)) throw new Error('Point values must be zero or greater');
+      if (!Number.isFinite(draft.redemptionRate) || draft.redemptionRate <= 0) throw new Error('Redemption rate must be greater than zero');
+      if (draft.services.some(service => !service.name.trim() || !Number.isFinite(service.price) || service.price < 0)) throw new Error('Every service needs a name and a non-negative price');
+      if (draft.membershipPlans.some(plan => plan.durationDays < 1 || plan.washesPerPeriod !== null && plan.washesPerPeriod < 1)) throw new Error('Membership duration and wash limits must be positive');
+      await db.settings.put({ ...draft, id: 'global', syncStatus: 'pending_sync' });
+      await notifyLocalWrite();
+      setMessage('Settings saved and queued for every Mali device.');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save settings'); }
+  }
 
-  const updateService = (index: number, field: string, value: any) => {
-    const updated = [...services];
-    updated[index] = { ...updated[index], [field]: value };
-    setServices(updated);
-  };
+  return <div className="mali-page"><div className="mali-page-inner max-w-7xl">
+    <PageHeader eyebrow="Control centre" title="Pricing & loyalty settings" description="One governed source for wash pricing, membership benefits and group-wide AutoPoints rules." action={<Button onClick={save}><Save className="h-4 w-4"/>Save all changes</Button>} />
+    {error&&<div className="mb-5 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-800"><AlertTriangle className="h-5 w-5"/>{error}</div>}
+    {message&&<div className="mb-5 flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-bold text-emerald-800"><CheckCircle2 className="h-5 w-5"/>{message}</div>}
 
-  const addService = () => {
-    setServices([...services, { id: uuidv4(), name: 'New Service', price: 0, type: 'wash' }]);
-  };
+    <div className="grid gap-6 xl:grid-cols-[.8fr_1.2fr] items-start">
+      <div className="space-y-6">
+        <Card><CardHeader><CardTitle>Group AutoPoints rules</CardTitle></CardHeader><CardContent className="grid gap-4 sm:grid-cols-2">
+          <label className="text-sm font-bold text-ink-700">Points per $1<Input className="mt-2" type="number" min="0" step="1" value={draft.pointsPerDollar} onChange={e=>numeric('pointsPerDollar',e.target.value)}/></label>
+          <label className="text-sm font-bold text-ink-700">Bonus per wash<Input className="mt-2" type="number" min="0" step="1" value={draft.pointsPerWash} onChange={e=>numeric('pointsPerWash',e.target.value)}/></label>
+          <label className="text-sm font-bold text-ink-700">Referral reward<Input className="mt-2" type="number" min="0" step="1" value={draft.referralRewardPoints} onChange={e=>numeric('referralRewardPoints',e.target.value)}/></label>
+          <label className="text-sm font-bold text-ink-700">Points worth $1<Input className="mt-2" type="number" min="1" step="1" value={draft.redemptionRate} onChange={e=>numeric('redemptionRate',e.target.value)}/></label>
+          <label className="text-sm font-bold text-ink-700 sm:col-span-2">Minimum points to redeem<Input className="mt-2" type="number" min="0" step="1" value={draft.minRedeemablePoints} onChange={e=>numeric('minRedeemablePoints',e.target.value)}/></label>
+        </CardContent></Card>
 
-  const removeService = (index: number) => {
-    setServices(services.filter((_, i) => i !== index));
-  };
-
-  return (
-    <div className="mali-page">
-      <div className="mali-page-inner max-w-6xl">
-      <PageHeader eyebrow="Control centre" title="Wash settings" description="Keep pricing, services, and loyalty rules clear, editable, and consistent across every till." />
-
-      <div className="grid gap-6 md:grid-cols-2 items-start">
-        <Card>
-          <CardHeader>
-            <CardTitle>Loyalty Rules</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-ink-700 mb-1">Points Earned per Wash</label>
-              <Input 
-                type="number" 
-                value={pointsPerWash}
-                onChange={e => setPointsPerWash(e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-ink-700 mb-1">Referral Reward Points</label>
-              <Input 
-                type="number" 
-                value={referralPoints}
-                onChange={e => setReferralPoints(e.target.value)}
-              />
-            </div>
-            <Button onClick={handleSavePoints} className="w-full bg-brand-900 hover:bg-brand-900">Save Rules</Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Services & Pricing</CardTitle>
-            <Button size="sm" variant="outline" onClick={addService} className="flex gap-1 items-center">
-              <Plus className="w-4 h-4" /> Add Service
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-              {services.map((s, idx) => (
-                <div key={s.id} className="flex flex-col gap-2 p-3 border border-ink-200 rounded-lg bg-white relative">
-                  <div className="flex gap-2">
-                    <div className="flex-1">
-                      <label className="text-xs text-ink-500 font-medium">Service Name</label>
-                      <Input 
-                        value={s.name} 
-                        onChange={(e) => updateService(idx, 'name', e.target.value)}
-                        className="h-8 text-sm"
-                      />
-                    </div>
-                    <div className="w-24">
-                      <label className="text-xs text-ink-500 font-medium">Price (USD)</label>
-                      <Input 
-                        type="number" 
-                        step="0.01"
-                        value={s.price} 
-                        onChange={(e) => updateService(idx, 'price', parseFloat(e.target.value) || 0)}
-                        className="h-8 text-sm font-bold text-brand-700"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2 justify-between items-center">
-                    <div>
-                      <select 
-                        value={s.type}
-                        onChange={(e) => updateService(idx, 'type', e.target.value)}
-                        className="h-8 text-xs bg-ink-50 border border-ink-200 rounded-md px-2"
-                      >
-                        <option value="wash">Wash</option>
-                        <option value="membership">Membership</option>
-                        <option value="fleet">Fleet</option>
-                      </select>
-                    </div>
-                    <button 
-                      onClick={() => removeService(idx)}
-                      className="text-red-500 hover:text-red-700 p-1 rounded-md hover:bg-red-50 transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            
-            <Button onClick={handleSaveServices} className="w-full bg-brand-900 hover:bg-brand-900 mt-4">Save Services</Button>
-          </CardContent>
-        </Card>
+        <Card><CardHeader><CardTitle>Membership benefits</CardTitle></CardHeader><CardContent className="space-y-4">{draft.membershipPlans.map((plan,index)=><div key={plan.id} className="rounded-xl border border-ink-200 p-4"><p className="font-black">{draft.services.find(service=>service.id===plan.id)?.name??plan.id}</p><div className="mt-3 grid gap-3 sm:grid-cols-2"><label className="text-xs font-bold text-ink-500">Duration days<Input className="mt-1" type="number" min="1" value={plan.durationDays} onChange={e=>updatePlan(index,{durationDays:Number(e.target.value)})}/></label><label className="text-xs font-bold text-ink-500">Wash cap (blank = unlimited)<Input className="mt-1" type="number" min="1" value={plan.washesPerPeriod??''} onChange={e=>updatePlan(index,{washesPerPeriod:e.target.value===''?null:Number(e.target.value)})}/></label></div><p className="mt-3 text-xs font-bold text-ink-500">Covered services</p><div className="mt-2 flex flex-wrap gap-2">{draft.services.filter(service=>service.type==='wash').map(service=><label key={service.id} className="flex items-center gap-2 rounded-full bg-ink-50 px-3 py-2 text-xs font-bold"><input type="checkbox" checked={plan.coveredServiceIds.includes(service.id)} onChange={e=>updatePlan(index,{coveredServiceIds:e.target.checked?[...plan.coveredServiceIds,service.id]:plan.coveredServiceIds.filter(id=>id!==service.id)})}/>{service.name}</label>)}</div></div>)}</CardContent></Card>
       </div>
-      </div>
+
+      <Card><CardHeader className="flex flex-row items-center justify-between"><CardTitle>Wash services & pricing</CardTitle><Button size="sm" variant="outline" onClick={addService}><Plus className="h-4 w-4"/>Add service</Button></CardHeader><CardContent className="space-y-3">{draft.services.map((service,index)=><div key={service.id} className="rounded-xl border border-ink-200 bg-white p-4"><div className="grid gap-3 sm:grid-cols-[1fr_9rem_9rem_auto] sm:items-end"><label className="text-xs font-bold text-ink-500">Service name<Input className="mt-1" value={service.name} onChange={e=>updateService(index,{name:e.target.value})}/></label><label className="text-xs font-bold text-ink-500">Price USD<Input className="mt-1" type="number" min="0" step="0.01" value={service.price} onChange={e=>updateService(index,{price:Number(e.target.value)})}/></label><label className="text-xs font-bold text-ink-500">Type<select className="mt-1 h-12 w-full rounded-lg border-2 border-ink-200 px-3 text-sm" value={service.type} onChange={e=>updateService(index,{type:e.target.value as WashService['type']})}><option value="wash">Wash</option><option value="membership">Membership</option><option value="fleet">Fleet</option></select></label><Button size="icon" variant="ghost" title="Remove service" onClick={()=>removeService(index)}><Trash2 className="h-4 w-4 text-red-600"/></Button></div></div>)}</CardContent></Card>
     </div>
-  );
+  </div></div>;
 }

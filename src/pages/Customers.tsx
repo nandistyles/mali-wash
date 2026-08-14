@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, getSettings } from '../lib/db';
-import { searchCustomers, addVehicle } from '../lib/customers';
+import { searchCustomers, addVehicle, findOrCreateCustomer } from '../lib/customers';
 import { getActiveMembership, describeMembership } from '../lib/memberships';
 import { voidTransaction } from '../lib/sales';
 import { notifyLocalWrite } from '../lib/sync';
@@ -12,20 +12,24 @@ import { useAuth } from '../lib/auth';
 import { Input } from '../components/ui/input';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { Search, Share2, Award, History, Star, Car, Plus, TrendingUp, Users } from 'lucide-react';
-import type { Customer } from '../types';
+import { Search, Share2, Award, History, Star, Car, Plus, TrendingUp, Users, UserPlus, X, Wrench, RadioTower } from 'lucide-react';
+import type { BusinessUnit, Customer } from '../types';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export default function Customers() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, staff } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showAddVehicle, setShowAddVehicle] = useState(false);
   const [vehicle, setVehicle] = useState({ reg: '', makeModel: '' });
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [newCustomer, setNewCustomer] = useState({ name: '', phone: '', reg: '', makeModel: '', referredByCode: '' });
 
   const settings = useLiveQuery(() => getSettings());
 
@@ -64,6 +68,16 @@ export default function Customers() {
     [selected?.id]
   );
 
+  const fitmentJobs = useLiveQuery(
+    () => selected ? db.fitmentJobs.where('customerId').equals(selected.id).reverse().sortBy('scheduledAt') : Promise.resolve([]),
+    [selected?.id]
+  );
+
+  const trackingSubscriptions = useLiveQuery(
+    () => selected ? db.trackingSubscriptions.where('customerId').equals(selected.id).toArray() : Promise.resolve([]),
+    [selected?.id]
+  );
+
   // Who this customer brought in — the flywheel, made visible.
   const referred = useLiveQuery(
     () => selected
@@ -85,10 +99,58 @@ export default function Customers() {
     setShowAddVehicle(false);
   };
 
+  const handleCreateCustomer = async () => {
+    if (!staff) return;
+    setCreating(true);
+    setCreateError('');
+    try {
+      if (!newCustomer.name.trim()) throw new Error('Enter the customer name');
+      const business = (staff.businesses[0] ?? 'wash') as BusinessUnit;
+      const { customer, created } = await findOrCreateCustomer({
+        name: newCustomer.name,
+        phone: newCustomer.phone,
+        vehicles: newCustomer.reg || newCustomer.makeModel
+          ? [{ reg: newCustomer.reg.toUpperCase(), makeModel: newCustomer.makeModel }]
+          : [],
+        referredByCode: newCustomer.referredByCode
+      }, business);
+      await notifyLocalWrite();
+      setSelectedId(customer.id);
+      setSearchTerm(customer.phone);
+      setShowCreate(false);
+      setNewCustomer({ name: '', phone: '', reg: '', makeModel: '', referredByCode: '' });
+      if (!created) setCreateError('That phone number already belonged to an existing customer. Their profile was opened.');
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : 'Could not create the customer');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <div className="mali-page">
       <div className="mali-page-inner max-w-[92rem] h-full flex flex-col">
-      <PageHeader eyebrow="One customer, one history" title="Customer 360" description="See every vehicle, visit, point, referral, and lifetime dollar in one shared Mali profile." />
+      <PageHeader eyebrow="One customer, one history" title="Customer 360" description="See every vehicle, visit, point, referral, and lifetime dollar in one shared Mali profile."
+        action={<Button onClick={() => { setCreateError(''); setShowCreate(true); }}><UserPlus className="h-4 w-4" /> New customer</Button>} />
+      {showCreate && (
+        <Card className="mb-5 border-brand-200 shadow-lg">
+          <CardContent className="p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div><h2 className="text-lg font-black text-ink-950">Create a shared customer</h2><p className="mt-1 text-sm text-ink-500">The phone number is checked across every Mali business.</p></div>
+              <button onClick={() => setShowCreate(false)} className="grid h-10 w-10 place-items-center rounded-xl bg-ink-100 text-ink-600" aria-label="Close"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <Input placeholder="Full name" value={newCustomer.name} onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })} />
+              <Input inputMode="tel" placeholder="Phone +263…" value={newCustomer.phone} onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })} />
+              <Input placeholder="Vehicle reg (optional)" value={newCustomer.reg} onChange={e => setNewCustomer({ ...newCustomer, reg: e.target.value.toUpperCase() })} />
+              <Input placeholder="Make & model" value={newCustomer.makeModel} onChange={e => setNewCustomer({ ...newCustomer, makeModel: e.target.value })} />
+              <Input placeholder="Referral code" value={newCustomer.referredByCode} onChange={e => setNewCustomer({ ...newCustomer, referredByCode: e.target.value.toUpperCase() })} />
+            </div>
+            {createError && <p className="mt-3 rounded-xl bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">{createError}</p>}
+            <div className="mt-4 flex justify-end"><Button disabled={creating} onClick={handleCreateCustomer}>{creating ? 'Saving…' : 'Save customer'}</Button></div>
+          </CardContent>
+        </Card>
+      )}
       <div className="flex flex-col lg:flex-row gap-5 flex-1 min-h-[36rem] overflow-hidden">
       <Card className="flex-1 flex flex-col h-full shrink-0 min-w-0">
         <div className="p-4 border-b border-ink-200">
@@ -242,6 +304,11 @@ export default function Customers() {
                     <Button size="sm" onClick={handleAddVehicle}>Save</Button>
                   </div>
                 )}
+              </div>
+
+              <div className="mb-5 grid gap-3 sm:grid-cols-2">
+                <div className="rounded-xl border border-violet-100 bg-violet-50 p-4"><div className="flex items-center gap-2 text-sm font-black text-violet-900"><Wrench className="h-4 w-4"/>Mali Drive</div><p className="mt-2 text-2xl font-black text-ink-950">{fitmentJobs?.length ?? 0}</p><p className="text-xs text-ink-500">fitment job{fitmentJobs?.length===1?'':'s'} · {(fitmentJobs??[]).filter(job=>!['completed','cancelled'].includes(job.status)).length} active</p></div>
+                <div className="rounded-xl border border-sky-100 bg-sky-50 p-4"><div className="flex items-center gap-2 text-sm font-black text-sky-900"><RadioTower className="h-4 w-4"/>Mali Track</div><p className="mt-2 text-2xl font-black text-ink-950">{trackingSubscriptions?.filter(subscription=>subscription.status==='active').length ?? 0}</p><p className="text-xs text-ink-500">active subscription{trackingSubscriptions?.filter(subscription=>subscription.status==='active').length===1?'':'s'}</p></div>
               </div>
 
               <div className="mb-5">

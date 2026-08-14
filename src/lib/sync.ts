@@ -3,6 +3,8 @@ import { db } from './db';
 import { db as firestore, auth, isFirebaseConfigured } from './firebase';
 import { collection, doc, writeBatch, getDocs, query, where } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
+import type { BusinessUnit, Staff } from '../types';
+import { recomputeBalance } from './points';
 
 /**
  * Offline-first sync (platform spec 4.2).
@@ -38,8 +40,8 @@ const LAST_PULL_KEY = 'mali_sync_last_pull';
 
 type TableName =
   | 'customers' | 'washMemberships' | 'transactions' | 'pointsLedger'
-  | 'staff' | 'shifts' | 'referralRedemptions' | 'bookings' | 'settings'
-  | 'inventoryItems' | 'fitmentJobs' | 'trackingDevices' | 'trackingSubscriptions';
+  | 'staff' | 'shifts' | 'cashSessions' | 'referralRedemptions' | 'bookings' | 'settings'
+  | 'inventoryItems' | 'inventoryMovements' | 'fitmentJobs' | 'trackingDevices' | 'trackingSubscriptions';
 
 /** Order matters: a transaction's customer must exist remotely before it lands. */
 const PUSH_ORDER: TableName[] = [
@@ -49,8 +51,10 @@ const PUSH_ORDER: TableName[] = [
   'pointsLedger',
   'referralRedemptions',
   'shifts',
+  'cashSessions',
   'bookings',
   'inventoryItems',
+  'inventoryMovements',
   'fitmentJobs',
   'trackingDevices',
   'trackingSubscriptions',
@@ -71,12 +75,58 @@ const PULL_PLAN: { table: TableName; field: string | null }[] = [
   // Needed on every device: the referral payout guard reads it to stay idempotent.
   { table: 'referralRedemptions', field: 'createdAt' },
   { table: 'shifts', field: 'openedAt' },
+  { table: 'cashSessions', field: 'openedAt' },
   { table: 'bookings', field: 'createdAt' },
   { table: 'inventoryItems', field: 'updatedAt' },
+  { table: 'inventoryMovements', field: 'createdAt' },
   { table: 'fitmentJobs', field: 'updatedAt' },
   { table: 'trackingDevices', field: 'updatedAt' },
   { table: 'trackingSubscriptions', field: 'updatedAt' }
 ];
+
+const SHARED_TABLES = new Set<TableName>([
+  'customers', 'transactions', 'pointsLedger', 'referralRedemptions'
+]);
+
+const TABLE_BUSINESS: Partial<Record<TableName, BusinessUnit>> = {
+  washMemberships: 'wash',
+  shifts: 'wash',
+  bookings: 'wash',
+  fitmentJobs: 'drive',
+  trackingDevices: 'track',
+  trackingSubscriptions: 'track'
+};
+
+interface SyncAccess {
+  staff: Staff;
+  businesses: Set<BusinessUnit>;
+}
+
+async function getSyncAccess(): Promise<SyncAccess | null> {
+  const uid = auth.currentUser?.uid;
+  if (!uid) return null;
+  const staff = await db.staff.get(uid);
+  if (!staff?.active) return null;
+  return { staff, businesses: new Set(staff.businesses) };
+}
+
+function canSyncTable(name: TableName, access: SyncAccess, direction: 'push' | 'pull'): boolean {
+  if (SHARED_TABLES.has(name)) return true;
+  if (name === 'staff') return direction === 'pull';
+  if (name === 'settings') return direction === 'pull' || access.staff.role === 'admin';
+  if (name === 'inventoryItems' || name === 'inventoryMovements' || name === 'cashSessions') return access.businesses.has('parts') || access.businesses.has('drive') || access.businesses.has('track');
+  const business = TABLE_BUSINESS[name];
+  return business ? access.businesses.has(business) : false;
+}
+
+function canSyncRecord(name: TableName, record: Record<string, unknown>, access: SyncAccess): boolean {
+  if (name !== 'inventoryItems' && name !== 'inventoryMovements' && name !== 'cashSessions') return true;
+  return access.businesses.has(record.business as BusinessUnit);
+}
+
+function watermarkKey(uid: string): string {
+  return `${LAST_PULL_KEY}:${uid}`;
+}
 
 export interface SyncState {
   isOnline: boolean;
@@ -112,10 +162,13 @@ function setState(patch: Partial<SyncState>) {
   subscribers.forEach(fn => fn(state));
 }
 
-export async function countPending(): Promise<number> {
+export async function countPending(access?: SyncAccess | null): Promise<number> {
+  const resolved = access === undefined ? await getSyncAccess() : access;
   let total = 0;
   for (const name of PUSH_ORDER) {
-    total += await db.table(name).where('syncStatus').equals('pending_sync').count();
+    if (resolved && !canSyncTable(name, resolved, 'push')) continue;
+    const pending = await db.table(name).where('syncStatus').equals('pending_sync').toArray();
+    total += resolved ? pending.filter(record => canSyncRecord(name, record, resolved)).length : pending.length;
   }
   return total;
 }
@@ -135,9 +188,10 @@ function chunk<T>(items: T[], size: number): T[][] {
  * not reachable; if Mali ever runs concurrent writers per device, gate the mark
  * on an unchanged updatedAt.
  */
-async function pushTable(name: TableName): Promise<void> {
+async function pushTable(name: TableName, access: SyncAccess): Promise<void> {
   const table = db.table(name);
-  const pending = await table.where('syncStatus').equals('pending_sync').toArray();
+  const pending = (await table.where('syncStatus').equals('pending_sync').toArray())
+    .filter(record => canSyncRecord(name, record, access));
   if (pending.length === 0) return;
 
   const collRef = collection(firestore, name);
@@ -163,7 +217,7 @@ async function pushTable(name: TableName): Promise<void> {
  * This is the rule that stops a failed push plus a successful pull from
  * destroying a sale.
  */
-async function pullTable(name: TableName, field: string | null, since: number): Promise<void> {
+async function pullTable(name: TableName, field: string | null, since: number, access: SyncAccess): Promise<string[]> {
   const table = db.table(name);
   const collRef = collection(firestore, name);
 
@@ -172,7 +226,7 @@ async function pullTable(name: TableName, field: string | null, since: number): 
     : query(collRef);
 
   const snapshot = await getDocs(q);
-  if (snapshot.empty) return;
+  if (snapshot.empty) return [];
 
   const pendingIds = new Set(
     (await table.where('syncStatus').equals('pending_sync').primaryKeys()) as string[]
@@ -180,9 +234,11 @@ async function pullTable(name: TableName, field: string | null, since: number): 
 
   const records = snapshot.docs
     .map(d => ({ ...d.data(), id: d.id, syncStatus: 'synced' as const }))
+    .filter(record => canSyncRecord(name, record, access))
     .filter(r => !pendingIds.has(r.id));
 
   if (records.length > 0) await table.bulkPut(records);
+  return records.map(record => record.id);
 }
 
 export async function performSync(): Promise<void> {
@@ -218,6 +274,16 @@ export async function performSync(): Promise<void> {
     return;
   }
 
+  const access = await getSyncAccess();
+  if (!access) {
+    setState({
+      pendingCount: await countPending(null),
+      lastError: 'Your staff access is inactive or has not been configured.',
+      signedIn: true
+    });
+    return;
+  }
+
   setState({ signedIn: true });
 
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
@@ -231,40 +297,54 @@ export async function performSync(): Promise<void> {
   const failures: string[] = [];
 
   try {
-    for (const name of PUSH_ORDER) {
+    for (const name of PUSH_ORDER.filter(name => canSyncTable(name, access, 'push'))) {
       try {
-        await pushTable(name);
+        await pushTable(name, access);
       } catch (err) {
         failures.push(`${name}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
-    const since = Number(localStorage.getItem(LAST_PULL_KEY) || 0);
+    const key = watermarkKey(access.staff.id);
+    const localIsEmpty = (await db.customers.count()) === 0 && (await db.transactions.count()) === 0;
+    const since = localIsEmpty ? 0 : Number(localStorage.getItem(key) || 0);
     const pullStartedAt = Date.now();
+    const affectedPointCustomers = new Set<string>();
 
-    for (const { table, field } of PULL_PLAN) {
+    for (const { table, field } of PULL_PLAN.filter(item => canSyncTable(item.table, access, 'pull'))) {
       try {
-        await pullTable(table, field, since);
+        const pulledIds = await pullTable(table, field, since, access);
+        if (table === 'pointsLedger' && pulledIds.length > 0) {
+          const entries = await db.pointsLedger.bulkGet(pulledIds);
+          entries.forEach(entry => { if (entry) affectedPointCustomers.add(entry.customerId); });
+        }
       } catch (err) {
         failures.push(`${table}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
 
+    // The append-only ledger wins over a last-write-wins cached balance. This
+    // makes devices converge after simultaneous point events instead of leaving
+    // whichever customer document happened to sync last as the answer.
+    for (const customerId of affectedPointCustomers) {
+      await recomputeBalance(customerId);
+    }
+
     // Only advance the watermark if every pull succeeded, so a failed
     // collection is retried rather than skipped over.
     if (failures.length === 0) {
-      localStorage.setItem(LAST_PULL_KEY, String(pullStartedAt));
+      localStorage.setItem(key, String(pullStartedAt));
     }
 
     setState({
       lastSync: failures.length === 0 ? new Date() : state.lastSync,
       lastError: failures.length === 0 ? null : failures[0],
-      pendingCount: await countPending()
+      pendingCount: await countPending(access)
     });
   } catch (err) {
     setState({
       lastError: err instanceof Error ? err.message : String(err),
-      pendingCount: await countPending()
+      pendingCount: await countPending(access)
     });
   } finally {
     inFlight = false;

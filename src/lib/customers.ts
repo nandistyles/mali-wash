@@ -89,6 +89,29 @@ export interface NewCustomerInput {
   tags?: string[];
 }
 
+function customerIdForPhone(phone: string): string {
+  return `customer_${phone.replace(/\D/g, '')}`;
+}
+
+function stableReferralCode(customerId: string): string {
+  // FNV-1a gives every device the same compact code for the same customer.
+  // Eight base-32 characters make accidental collisions vanishingly unlikely
+  // while keeping the code easy to read over WhatsApp or at the counter.
+  let hash = 0x811c9dc5;
+  for (const char of customerId) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  let value = hash;
+  let suffix = '';
+  for (let i = 0; i < 8; i++) {
+    suffix += REFERRAL_ALPHABET[value % REFERRAL_ALPHABET.length];
+    value = Math.floor(value / REFERRAL_ALPHABET.length) ^ Math.imul(hash, i + 17);
+    value >>>= 0;
+  }
+  return `MALI-${suffix}`;
+}
+
 /**
  * Create a customer, or return the existing one if the phone is already known.
  * `created` tells the caller which happened so the UI can say so rather than
@@ -106,12 +129,14 @@ export async function findOrCreateCustomer(
 
   const referredByCode = input.referredByCode?.trim().toUpperCase() || null;
   const customer: Customer = {
-    id: uuidv4(),
+    // A deterministic phone-backed id prevents two offline devices from
+    // creating two Firestore documents for the same person.
+    id: customerIdForPhone(phone),
     name: input.name.trim(),
     phone,
     vehicles: (input.vehicles || []).filter(v => v.reg || v.makeModel),
     pointsBalance: 0,
-    referralCode: await generateUniqueReferralCode(),
+    referralCode: stableReferralCode(customerIdForPhone(phone)),
     referredByCode,
     tags: input.tags || [],
     createdByBusiness: business,
@@ -120,8 +145,16 @@ export async function findOrCreateCustomer(
     syncStatus: 'pending_sync'
   };
 
-  await db.customers.add(customer);
-  return { customer, created: true };
+  try {
+    await db.customers.add(customer);
+    return { customer, created: true };
+  } catch (error) {
+    // Two tabs can still race between the lookup and add. The deterministic id
+    // turns that race into a harmless read of the winner.
+    const winner = await db.customers.get(customer.id);
+    if (winner) return { customer: winner, created: false };
+    throw error;
+  }
 }
 
 export async function addVehicle(customerId: string, vehicle: Vehicle): Promise<void> {
@@ -173,7 +206,9 @@ export async function maybeAwardReferralReward(
   if (rewardPoints <= 0) return null;
 
   const redemption: ReferralRedemption = {
-    id: uuidv4(),
+    // One deterministic document per referee makes the reward idempotent even
+    // when their first purchase is recorded on two devices before either syncs.
+    id: `referral_${customerId}`,
     referrerId: referrer.id,
     refereeId: customerId,
     business,
@@ -182,7 +217,13 @@ export async function maybeAwardReferralReward(
     syncStatus: 'pending_sync'
   };
 
-  await db.referralRedemptions.add(redemption);
+  try {
+    await db.referralRedemptions.add(redemption);
+  } catch (error) {
+    const winner = await db.referralRedemptions.get(redemption.id);
+    if (winner) return null;
+    throw error;
+  }
   await award(
     referrer.id,
     business,

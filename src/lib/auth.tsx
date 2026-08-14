@@ -72,11 +72,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  */
 async function resolveStaff(uid: string): Promise<Staff | null> {
   const local = await db.staff.get(uid);
-  if (local) {
-    // Refresh in the background; never block the till on the network.
-    void refreshStaffFromRemote(uid);
-    return local;
-  }
+  if (local) return local;
   return refreshStaffFromRemote(uid);
 }
 
@@ -99,6 +95,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
+    let currentUser: User | null = null;
 
     // Restore a dev session across reloads so hot-reloading does not sign you out.
     if (DEV_LOGIN_ENABLED && sessionStorage.getItem(DEV_SESSION_KEY) === 'true') {
@@ -110,8 +107,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return () => { cancelled = true; };
     }
 
+    const applyStaffState = (staff: Staff | null, user: User) => {
+      if (cancelled) return;
+      if (!staff) setState({ status: 'no_staff_record', user });
+      else if (!staff.active) setState({ status: 'inactive', staff });
+      else setState({ status: 'ready', staff, user, isDevSession: false });
+    };
+
+    const refreshActiveStaff = async () => {
+      const user = currentUser;
+      if (!user || !navigator.onLine) return;
+      try {
+        const snap = await getDoc(doc(firestore, 'staff', user.uid));
+        if (!snap.exists()) {
+          applyStaffState(null, user);
+          return;
+        }
+        const staff = { ...(snap.data() as Staff), id: user.uid, syncStatus: 'synced' as const };
+        await db.staff.put(staff);
+        applyStaffState(staff, user);
+      } catch (error) {
+        // A network outage must not lock an already-authorised attendant out.
+        console.warn('Could not refresh staff access:', error);
+      }
+    };
+
     const unsub = onAuthStateChanged(auth, async user => {
       if (cancelled) return;
+      currentUser = user;
 
       if (!user) {
         setState({ status: 'signed_out' });
@@ -121,16 +144,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const staff = await resolveStaff(user.uid);
       if (cancelled) return;
 
-      if (!staff) {
-        setState({ status: 'no_staff_record', user });
-      } else if (!staff.active) {
-        setState({ status: 'inactive', staff });
-      } else {
-        setState({ status: 'ready', staff, user, isDevSession: false });
-      }
+      applyStaffState(staff, user);
+      // Cached access opens the offline app immediately; this second pass makes
+      // online deactivation, role and business changes effective without reload.
+      void refreshActiveStaff();
     });
 
-    return () => { cancelled = true; unsub(); };
+    const onOnline = () => { void refreshActiveStaff(); };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') void refreshActiveStaff();
+    };
+    window.addEventListener('online', onOnline);
+    document.addEventListener('visibilitychange', onVisibility);
+    const refreshTimer = window.setInterval(() => { void refreshActiveStaff(); }, 5 * 60_000);
+
+    return () => {
+      cancelled = true;
+      unsub();
+      window.removeEventListener('online', onOnline);
+      document.removeEventListener('visibilitychange', onVisibility);
+      window.clearInterval(refreshTimer);
+    };
   }, []);
 
   const value: AuthContextValue = {

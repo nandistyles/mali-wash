@@ -144,10 +144,11 @@ export interface BusinessMetrics {
 }
 
 export async function computeMetrics(sinceMs: number, untilMs = Date.now(), business?: BusinessUnit): Promise<BusinessMetrics> {
-  const [allTxns, customers, memberships, settings] = await Promise.all([
+  const [allTxns, customers, memberships, trackingSubscriptions, settings] = await Promise.all([
     db.transactions.where('createdAt').between(sinceMs, untilMs, true, true).toArray(),
     db.customers.toArray(),
     db.washMemberships.toArray(),
+    db.trackingSubscriptions.toArray(),
     getSettings()
   ]);
 
@@ -187,14 +188,16 @@ export async function computeMetrics(sinceMs: number, untilMs = Date.now(), busi
   ) / 100;
 
   const now = Date.now();
-  const active = business && business !== 'wash' ? [] : memberships.filter(m => m.tier !== 'none' && (m.expiry === null || m.expiry > now));
-  const membershipMrr = active.reduce((sum, m) => {
+  const activeWash = business && business !== 'wash' ? [] : memberships.filter(m => m.tier !== 'none' && (m.expiry === null || m.expiry > now));
+  const activeTrack = business && business !== 'track' ? [] : trackingSubscriptions.filter(subscription => subscription.status === 'active');
+  const washMrr = activeWash.reduce((sum, m) => {
     const plan = settings.membershipPlans.find(p => p.tier === m.tier);
     const service = plan ? settings.services.find(s => s.id === plan.id) : undefined;
     if (!plan || !service) return sum;
     // Normalise whatever the plan period is onto a 30-day month.
     return sum + (service.price * (30 / plan.durationDays));
   }, 0);
+  const trackingMrr = activeTrack.reduce((sum, subscription) => sum + subscription.monthlyFee, 0);
 
   const outstandingPoints = customers.reduce((s, c) => s + Math.max(0, c.pointsBalance || 0), 0);
   const pointsLiabilityUsd = settings.redemptionRate > 0
@@ -209,8 +212,8 @@ export async function computeMetrics(sinceMs: number, untilMs = Date.now(), busi
     newCustomers,
     returningCustomerRevenue,
     repeatRate,
-    activeMemberships: active.length,
-    membershipMrr: Math.round(membershipMrr * 100) / 100,
+    activeMemberships: activeWash.length + activeTrack.length,
+    membershipMrr: Math.round((washMrr + trackingMrr) * 100) / 100,
     pointsLiabilityUsd,
     voidedCount: voided.length,
     voidedValue: Math.round(voided.reduce((s, t) => s + t.amount, 0) * 100) / 100

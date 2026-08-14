@@ -14,6 +14,15 @@ import type { BusinessUnit, PointsLedgerEntry } from '../types';
 
 type LedgerType = PointsLedgerEntry['type'];
 
+function stableToken(value: string): string {
+  let hash = 0x811c9dc5;
+  for (const char of value) {
+    hash ^= char.charCodeAt(0);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash.toString(36);
+}
+
 async function writeEntry(
   customerId: string,
   business: BusinessUnit,
@@ -22,8 +31,11 @@ async function writeEntry(
   reason: string,
   transactionId?: string | null
 ): Promise<PointsLedgerEntry> {
+  const entryId = transactionId
+    ? `points_${type}_${stableToken(`${customerId}|${transactionId}|${points}|${reason}`)}`
+    : uuidv4();
   const entry: PointsLedgerEntry = {
-    id: uuidv4(),
+    id: entryId,
     customerId,
     business,
     type,
@@ -43,6 +55,8 @@ async function writeEntry(
       throw new Error('Insufficient points balance');
     }
 
+    const existing = await db.pointsLedger.get(entry.id);
+    if (existing) return;
     await db.pointsLedger.add(entry);
     await db.customers.update(customerId, {
       pointsBalance: nextBalance,

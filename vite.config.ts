@@ -16,9 +16,9 @@ export default defineConfig(() => {
         // icons that 404'd in production.
         includeAssets: ['favicon.svg', 'favicon-48x48.png', 'apple-touch-icon.png', 'masked-icon.svg'],
         manifest: {
-          name: 'Mali Holdings · Wash',
-          short_name: 'Mali Wash',
-          description: 'Mali Holdings customer, loyalty and wash operations platform',
+          name: 'Mali Holdings Automotive OS',
+          short_name: 'Mali Holdings',
+          description: 'One customer, one ledger and one operating system across Mali automotive businesses',
           theme_color: '#063e3d',
           background_color: '#f6f8f8',
           display: 'standalone',

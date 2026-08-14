@@ -19,6 +19,7 @@ const BusinessWorkspace = lazy(() => import('./pages/BusinessWorkspace'));
 const PartsOperations = lazy(() => import('./pages/PartsOperations'));
 const DriveOperations = lazy(() => import('./pages/DriveOperations'));
 const TrackOperations = lazy(() => import('./pages/TrackOperations'));
+const CashControl = lazy(() => import('./pages/CashControl'));
 
 function ScreenLoader() {
   return (
@@ -42,7 +43,7 @@ function NotFound() {
         <h1 className="brand-text-gradient text-5xl font-black tracking-[-0.05em] mt-4">This road ends here.</h1>
         <p className="text-brand-100/65 mt-4">The page you’re looking for has moved or never existed.</p>
         <Link to="/" className="inline-flex items-center gap-2 mt-8 bg-white text-brand-900 rounded-xl h-12 px-5 font-extrabold">
-          <ArrowLeft className="w-4 h-4" /> Back to Mali Wash
+          <ArrowLeft className="w-4 h-4" /> Back to Mali Holdings
         </Link>
       </div>
     </div>
@@ -68,6 +69,12 @@ function BusinessOnly({ business, children }: { business: string; children: Reac
   return <>{children}</>;
 }
 
+function CashOnly({ children }: { children: ReactNode }) {
+  const { canOperate } = useAuth();
+  if (!['parts', 'drive', 'track'].some(canOperate)) return <Navigate to="/" replace />;
+  return <>{children}</>;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -83,12 +90,13 @@ export default function App() {
               <Route path="parts/operations" element={<BusinessOnly business="parts"><PartsOperations /></BusinessOnly>} />
               <Route path="drive/operations" element={<BusinessOnly business="drive"><DriveOperations /></BusinessOnly>} />
               <Route path="track/operations" element={<BusinessOnly business="track"><TrackOperations /></BusinessOnly>} />
+              <Route path="cash" element={<CashOnly><CashControl /></CashOnly>} />
               <Route path="pos" element={<BusinessOnly business="wash"><POS /></BusinessOnly>} />
               <Route path="customers" element={<Customers />} />
-              <Route path="shifts" element={<Shifts />} />
+              <Route path="shifts" element={<BusinessOnly business="wash"><Shifts /></BusinessOnly>} />
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="growth" element={<Growth />} />
-              <Route path="bookings" element={<Bookings />} />
+              <Route path="bookings" element={<BusinessOnly business="wash"><Bookings /></BusinessOnly>} />
               <Route path="settings" element={<AdminOnly><Settings /></AdminOnly>} />
             </Route>
             <Route path="*" element={<NotFound />} />

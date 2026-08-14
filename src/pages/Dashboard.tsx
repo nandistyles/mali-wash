@@ -154,7 +154,7 @@ export default function Dashboard() {
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <Stat icon={CreditCard} label="Active memberships" value={String(metrics.activeMemberships)}
+              <Stat icon={CreditCard} label={business === 'track' ? 'Active subscriptions' : business === 'all' ? 'Recurring customers' : 'Active memberships'} value={String(metrics.activeMemberships)}
                 sub={`${formatCurrency(metrics.membershipMrr)} recurring / month`} tone="good" />
               <Stat icon={DollarSign} label="Returning-customer revenue"
                 value={formatCurrency(metrics.returningCustomerRevenue)}

@@ -11,6 +11,12 @@ import type { Customer, Transaction } from '../types';
  */
 
 const LINE = '--------------------------------';
+const BUSINESS_LABEL = {
+  wash: 'MALI WASH',
+  parts: 'MALI PARTS',
+  drive: 'MALI DRIVE',
+  track: 'MALI TRACK'
+} as const;
 
 function formatDate(ts: number): string {
   const d = new Date(ts);
@@ -27,7 +33,8 @@ const PAYMENT_LABEL: Record<string, string> = {
 export function receiptText(txn: Transaction, customer?: Customer | null): string {
   const lines: string[] = [];
 
-  lines.push('*MALI WASH* — Ruwa');
+  const businessName = BUSINESS_LABEL[txn.business];
+  lines.push(`*${businessName}* - Ruwa`);
   lines.push(formatDate(txn.createdAt));
   lines.push(`Receipt: ${txn.id.slice(0, 8).toUpperCase()}`);
   if (txn.status === 'voided') lines.push('*** VOIDED ***');
@@ -50,11 +57,11 @@ export function receiptText(txn: Transaction, customer?: Customer | null): strin
     lines.push(`Balance: ${customer.pointsBalance} pts`);
     lines.push('');
     lines.push(`Your referral code: *${customer.referralCode}*`);
-    lines.push('Share it — you earn points when a friend gets their first wash.');
+    lines.push('Share it - you earn points when a friend makes their first Mali purchase.');
   }
 
   lines.push(LINE);
-  lines.push('Thank you for choosing Mali Wash!');
+  lines.push('Thank you for choosing Mali Holdings!');
 
   return lines.join('\n');
 }
@@ -82,6 +89,7 @@ export function printReceipt(txn: Transaction, customer?: Customer | null): void
       <div class="code">Referral code: <b>${esc(customer.referralCode)}</b></div>
     </div>` : '';
 
+  const businessName = BUSINESS_LABEL[txn.business];
   const html = `<!doctype html>
 <html><head><meta charset="utf-8"><title>Receipt ${esc(txn.id.slice(0, 8))}</title>
 <style>
@@ -101,7 +109,7 @@ export function printReceipt(txn: Transaction, customer?: Customer | null): void
   .void { text-align: center; font-weight: bold; border: 2px solid #000; padding: 4px; margin: 6px 0; }
 </style></head>
 <body>
-  <h1>MALI WASH</h1>
+  <h1>${businessName}</h1>
   <div class="sub">Ruwa, Zimbabwe<br>${formatDate(txn.createdAt)}<br>Receipt ${esc(txn.id.slice(0, 8).toUpperCase())}</div>
   ${txn.status === 'voided' ? '<div class="void">*** VOIDED ***</div>' : ''}
   <hr>
@@ -112,7 +120,7 @@ export function printReceipt(txn: Transaction, customer?: Customer | null): void
   ${customer ? `<div class="row"><span>Customer</span><span>${esc(customer.name)}</span></div>
   <div class="row"><span>Phone</span><span>${esc(formatPhone(customer.phone))}</span></div>` : ''}
   ${loyalty}
-  <div class="foot">Thank you for choosing Mali Wash!</div>
+  <div class="foot">Thank you for choosing Mali Holdings!</div>
 </body></html>`;
 
   const frame = document.createElement('iframe');

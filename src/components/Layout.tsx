@@ -3,7 +3,7 @@ import { useSync } from '../lib/sync';
 import { useAuth } from '../lib/auth';
 import {
   CalendarDays, CarFront, Clock3, LayoutDashboard, LogOut, Building2, PackageOpen, CircleGauge, RadioTower,
-  RefreshCw, Settings, Sparkles, TriangleAlert, TrendingUp, UsersRound
+  RefreshCw, Settings, Sparkles, TriangleAlert, TrendingUp, UsersRound, WalletCards
 } from 'lucide-react';
 import BrandMark from './BrandMark';
 
@@ -26,8 +26,9 @@ export default function Layout() {
     { path: '/drive', label: 'Drive', icon: CircleGauge, business: 'drive' },
     { path: '/track', label: 'Track', icon: RadioTower, business: 'track' },
     { path: '/customers', label: 'Customers', icon: UsersRound },
-    { path: '/shifts', label: 'Shifts', icon: Clock3 },
-    { path: '/bookings', label: 'Bookings', icon: CalendarDays },
+    ...((staff?.businesses ?? []).some(business => business !== 'wash') ? [{ path: '/cash', label: 'Cash drawers', icon: WalletCards }] : []),
+    { path: '/shifts', label: 'Shifts', icon: Clock3, business: 'wash' },
+    { path: '/bookings', label: 'Bookings', icon: CalendarDays, business: 'wash' },
     { path: '/growth', label: 'Growth', icon: TrendingUp },
     { path: '/dashboard', label: 'Reports', icon: LayoutDashboard },
     ...(isAdmin ? [{ path: '/settings', label: 'Settings', icon: Settings }] : []),

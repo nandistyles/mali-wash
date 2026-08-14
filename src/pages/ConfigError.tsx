@@ -17,7 +17,7 @@ export default function ConfigError() {
     <div className="min-h-screen bg-ink-50 flex items-center justify-center p-4">
       <div className="w-full max-w-xl bg-white rounded-xl shadow-xl border-2 border-red-200 overflow-hidden">
         <div className="bg-red-600 text-white px-6 py-4">
-          <h1 className="text-xl font-bold">Not configured for Mali Wash</h1>
+        <h1 className="text-xl font-bold">Mali Holdings is not configured</h1>
         </div>
 
         <div className="p-6 space-y-4 text-ink-700">
