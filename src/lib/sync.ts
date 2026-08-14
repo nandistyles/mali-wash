@@ -38,7 +38,8 @@ const LAST_PULL_KEY = 'mali_sync_last_pull';
 
 type TableName =
   | 'customers' | 'washMemberships' | 'transactions' | 'pointsLedger'
-  | 'staff' | 'shifts' | 'referralRedemptions' | 'bookings' | 'settings';
+  | 'staff' | 'shifts' | 'referralRedemptions' | 'bookings' | 'settings'
+  | 'inventoryItems' | 'fitmentJobs' | 'trackingDevices' | 'trackingSubscriptions';
 
 /** Order matters: a transaction's customer must exist remotely before it lands. */
 const PUSH_ORDER: TableName[] = [
@@ -49,6 +50,10 @@ const PUSH_ORDER: TableName[] = [
   'referralRedemptions',
   'shifts',
   'bookings',
+  'inventoryItems',
+  'fitmentJobs',
+  'trackingDevices',
+  'trackingSubscriptions',
   'settings'   // was missing entirely — price edits never reached Firestore,
 ];             // and the next pull overwrote them with the stale remote value.
 
@@ -66,7 +71,11 @@ const PULL_PLAN: { table: TableName; field: string | null }[] = [
   // Needed on every device: the referral payout guard reads it to stay idempotent.
   { table: 'referralRedemptions', field: 'createdAt' },
   { table: 'shifts', field: 'openedAt' },
-  { table: 'bookings', field: 'createdAt' }
+  { table: 'bookings', field: 'createdAt' },
+  { table: 'inventoryItems', field: 'updatedAt' },
+  { table: 'fitmentJobs', field: 'updatedAt' },
+  { table: 'trackingDevices', field: 'updatedAt' },
+  { table: 'trackingSubscriptions', field: 'updatedAt' }
 ];
 
 export interface SyncState {

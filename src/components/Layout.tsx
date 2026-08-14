@@ -9,7 +9,7 @@ import BrandMark from './BrandMark';
 
 export default function Layout() {
   const { isOnline, syncing, lastSync, pendingCount, lastError, configured, signedIn, triggerSync } = useSync();
-  const { staff, isAdmin, signOut, state } = useAuth();
+  const { staff, isAdmin, signOut, state, canOperate } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const isDevSession = state.status === 'ready' && state.isDevSession;
@@ -21,17 +21,18 @@ export default function Layout() {
 
   const navItems = [
     { path: '/', label: 'Holdings', icon: Building2, exact: true },
-    { path: '/wash', label: 'Wash', icon: CarFront },
-    { path: '/parts', label: 'Parts', icon: PackageOpen },
-    { path: '/drive', label: 'Drive', icon: CircleGauge },
-    { path: '/track', label: 'Track', icon: RadioTower },
+    { path: '/wash', label: 'Wash', icon: CarFront, business: 'wash' },
+    { path: '/parts', label: 'Parts', icon: PackageOpen, business: 'parts' },
+    { path: '/drive', label: 'Drive', icon: CircleGauge, business: 'drive' },
+    { path: '/track', label: 'Track', icon: RadioTower, business: 'track' },
     { path: '/customers', label: 'Customers', icon: UsersRound },
     { path: '/shifts', label: 'Shifts', icon: Clock3 },
     { path: '/bookings', label: 'Bookings', icon: CalendarDays },
     { path: '/growth', label: 'Growth', icon: TrendingUp },
     { path: '/dashboard', label: 'Reports', icon: LayoutDashboard },
     ...(isAdmin ? [{ path: '/settings', label: 'Settings', icon: Settings }] : []),
-  ];
+  ].filter(item => !('business' in item) || canOperate(item.business));
+  const mobileItems = navItems.filter(item => ['/', '/wash', '/parts', '/drive', '/track', '/customers'].includes(item.path));
 
   const status = !configured
     ? { dot: 'bg-ink-400', ring: 'bg-ink-400/30', label: pendingCount ? `Local · ${pendingCount}` : 'Local only' }
@@ -97,8 +98,8 @@ export default function Layout() {
         <header className="h-[66px] bg-white/90 border-b border-border px-4 sm:px-6 flex items-center justify-between shrink-0 backdrop-blur-xl z-20">
           <div className="md:hidden"><BrandMark compact /></div>
           <div className="hidden md:block">
-            <p className="mali-eyebrow">Mali Holdings · Wash</p>
-            <p className="text-sm font-semibold text-ink-500 mt-1">Good service, remembered.</p>
+            <p className="mali-eyebrow">Mali Holdings · Automotive</p>
+            <p className="text-sm font-semibold text-ink-500 mt-1">One customer. Every road.</p>
           </div>
 
           <div className="flex items-center gap-2.5 ml-auto">
@@ -136,7 +137,7 @@ export default function Layout() {
 
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 border-t border-border backdrop-blur-xl px-1 pb-[env(safe-area-inset-bottom)]" aria-label="Mobile navigation">
           <div className="h-[70px] flex items-stretch justify-around overflow-x-auto">
-            {navItems.map(item => {
+            {mobileItems.map(item => {
               const active = item.exact ? location.pathname === item.path : location.pathname.startsWith(item.path);
               return (
                 <Link key={item.path} to={item.path} aria-current={active ? 'page' : undefined}
@@ -153,7 +154,7 @@ export default function Layout() {
 
         <footer className="hidden md:flex h-7 bg-ink-950 items-center justify-between px-5 text-[9px] text-ink-400 font-bold uppercase tracking-widest shrink-0">
           <span>{configured && signedIn && lastSync ? `Last sync · ${lastSync.toLocaleTimeString()}` : status.label}</span>
-          <span>Mali Holdings · Wash v1.2</span>
+          <span>Mali Holdings · Automotive OS v2.0</span>
         </footer>
       </div>
     </div>

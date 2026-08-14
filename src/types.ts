@@ -140,6 +140,68 @@ export interface WashService {
   type: "wash" | "membership" | "fleet";
 }
 
+// ---------------------------------------------------------------------------
+// BUSINESS-SPECIFIC OPERATIONAL RECORDS
+// These records stay in their spoke. Customer-facing money still lands in the
+// shared Transaction collection through commitBusinessSale().
+// ---------------------------------------------------------------------------
+
+export interface InventoryItem {
+  id: string;
+  business: "parts" | "drive";
+  sku: string;
+  name: string;
+  category: string;
+  sellPrice: number;
+  costPrice: number;
+  stockQty: number;
+  reorderLevel: number;
+  active: boolean;
+  updatedAt: number;
+  syncStatus?: SyncStatus;
+}
+
+export interface FitmentJob {
+  id: string;
+  customerId?: string | null;
+  customerName: string;
+  phone: string;
+  vehicleReg: string;
+  description: string;
+  scheduledAt: number;
+  status: "booked" | "in_progress" | "completed" | "cancelled";
+  quotedAmount: number;
+  createdAt: number;
+  updatedAt: number;
+  syncStatus?: SyncStatus;
+}
+
+export interface TrackingDevice {
+  id: string;
+  serialNumber: string;
+  imei: string;
+  model: string;
+  status: "in_stock" | "assigned" | "installed" | "faulty";
+  customerId?: string | null;
+  vehicleReg?: string | null;
+  updatedAt: number;
+  syncStatus?: SyncStatus;
+}
+
+export interface TrackingSubscription {
+  id: string;
+  customerId: string;
+  deviceId: string;
+  vehicleReg: string;
+  planName: string;
+  monthlyFee: number;
+  status: "active" | "past_due" | "suspended" | "cancelled";
+  startedAt: number;
+  renewalAt: number;
+  updatedAt: number;
+  syncStatus?: SyncStatus;
+}
+
 /**
  * What a membership actually buys. Previously membership was a bare flag, which
  * meant an $18 basic member got $15 premium details free and the benefit never

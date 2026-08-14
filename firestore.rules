@@ -264,6 +264,49 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Parts, Drive and Track operational spokes. Customer-facing money from
+    // these collections is still recorded in the shared transaction ledger.
+    match /inventoryItems/{itemId} {
+      allow get, list: if isStaff();
+      allow create, update: if isValidId(itemId)
+        && incoming().business in ['parts', 'drive']
+        && canOperate(incoming().business)
+        && incoming().id == itemId
+        && incoming().name is string && incoming().sku is string
+        && incoming().stockQty is number && incoming().sellPrice is number
+        && incoming().updatedAt is number;
+      allow delete: if isAdmin();
+    }
+
+    match /fitmentJobs/{jobId} {
+      allow get, list: if canOperate('drive');
+      allow create, update: if canOperate('drive') && isValidId(jobId)
+        && incoming().id == jobId
+        && incoming().status in ['booked', 'in_progress', 'completed', 'cancelled']
+        && incoming().scheduledAt is number && incoming().updatedAt is number;
+      allow delete: if isAdmin();
+    }
+
+    match /trackingDevices/{deviceId} {
+      allow get, list: if canOperate('track');
+      allow create, update: if canOperate('track') && isValidId(deviceId)
+        && incoming().id == deviceId
+        && incoming().status in ['in_stock', 'assigned', 'installed', 'faulty']
+        && incoming().serialNumber is string && incoming().imei is string
+        && incoming().updatedAt is number;
+      allow delete: if isAdmin();
+    }
+
+    match /trackingSubscriptions/{subscriptionId} {
+      allow get, list: if canOperate('track');
+      allow create, update: if canOperate('track') && isValidId(subscriptionId)
+        && incoming().id == subscriptionId
+        && incoming().status in ['active', 'past_due', 'suspended', 'cancelled']
+        && incoming().monthlyFee is number && incoming().renewalAt is number
+        && incoming().updatedAt is number;
+      allow delete: if isAdmin();
+    }
+
     // Anything not matched above is denied by default. There is deliberately
     // no `match /{document=**}` catch-all here: Firestore ORs all matching
     // rules together, so a catch-all can only ever widen access, never
